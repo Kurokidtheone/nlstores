@@ -24,4 +24,3 @@ Next Level Stores: one Next.js app on Cloudflare (Workers + D1 + R2) serves many
 ## Not decided yet
 
 - **Domain not bought yet.** `wrangler.jsonc` (`ROOT_DOMAIN`, `ADMIN_HOST`) and the build variables still use the placeholder `yourbrand.com`. When the owner gives the domain, replace it everywhere (`grep -rn yourbrand.com`).
-- **D1 database ID:** `REPLACE_WITH_D1_ID` in `wrangler.jsonc` until the owner creates `stores-db` in Cloudflare.
