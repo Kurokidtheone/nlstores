@@ -3,6 +3,7 @@
 /* ---------- base tokens (every design overrides some of them) ---------- */
 :root {
   --brand: #db2777; /* set per store from stores.primary_color */
+  --accent: #111827; /* stores.accent_color: announcement bar, badges, footer (white text) */
   --bg: #ffffff;
   --card: #ffffff;
   --text: #111827;
@@ -21,6 +22,12 @@ body {
   color: var(--text);
   font-family: var(--font);
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Re-computed where --brand is set (store root, design thumbnails), not only on :root */
+.store,
+[data-design] {
+  --soft: color-mix(in srgb, var(--brand) 8%, white);
 }
 
 /* ---------- designs ---------- */
@@ -84,6 +91,14 @@ body {
 }
 .store-brand {
   color: var(--brand);
+}
+.store-accent {
+  background: var(--accent);
+  color: #fff;
+}
+/* Product pages have a fixed "Order" bar: keep the footer readable above it */
+.store:has(.store-fixed-cta) .store-footer {
+  padding-bottom: 7rem;
 }
 .store-soft {
   background: var(--soft);

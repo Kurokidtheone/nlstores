@@ -8,6 +8,10 @@ VALUES ('demo', 'Glow Demo', 'ar', 'glow', '#db2777', '0555000000', 'Demo', '055
         'pbkdf2$100000$LmSWY/SuUD2sQyj45XyUXw==$EcZQsE4QKacDHbxgjOfKhYfCRoT14j71tLWjWFCobVk=',
         '2099-12-31T00:00:00Z');
 
+-- Settings added in migration 0002 (only filled once, so a seller's edits are kept)
+UPDATE stores SET accent_color = '#831843', announcement = 'التوصيل مجاني ابتداء من قطعتين 🚚', announcement_on = 1
+WHERE slug = 'demo' AND announcement = '';
+
 INSERT OR IGNORE INTO domains (hostname, store_id, kind)
 SELECT 'demo.localhost', id, 'subdomain' FROM stores WHERE slug = 'demo';
 

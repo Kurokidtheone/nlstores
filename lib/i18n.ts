@@ -41,6 +41,9 @@ const dict = {
   whatsapp_us: { ar: "راسلنا على واتساب", fr: "Écrivez-nous sur WhatsApp" },
   store_unavailable: { ar: "المتجر غير متوفر حاليا", fr: "Boutique momentanément indisponible" },
   no_products: { ar: "لا توجد منتجات بعد", fr: "Aucun produit pour le moment" },
+  policy_title: { ar: "التوصيل والإرجاع", fr: "Livraison et retours" },
+  footer_cod: { ar: "الدفع عند الاستلام في 69 ولاية", fr: "Paiement à la livraison dans les 69 wilayas" },
+  preview_design: { ar: "معاينة التصميم — لم يتم الحفظ بعد", fr: "Aperçu du design — pas encore enregistré" },
   preview_hidden: { ar: "معاينة: هذا المنتج مخفي عن الزبائن", fr: "Aperçu : ce produit est masqué aux clients" },
 } as const;
 

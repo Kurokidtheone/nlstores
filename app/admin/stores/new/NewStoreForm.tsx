@@ -28,7 +28,7 @@ export function NewStoreForm({ rootDomain, designs }: { rootDomain: string; desi
         <input name="owner_phone" className="dash-input" dir="ltr" inputMode="tel" required />
       </label>
       <label className="block space-y-1">
-        <Bi fr="Mot de passe (8 caractères min.)" ar="كلمة السر" />
+        <Bi fr="Mot de passe provisoire (8 caractères min.)" ar="كلمة سر مؤقتة — البائع يغيرها عند أول دخول" />
         <input name="password" className="dash-input" minLength={8} required />
       </label>
       <div className="grid grid-cols-2 gap-3">

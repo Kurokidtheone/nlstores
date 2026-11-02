@@ -4,9 +4,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { DESIGNS } from "@/designs/registry";
+import { DEFAULT_POLICY } from "@/lib/policy";
 import { WILAYA_COUNT } from "@/lib/algeria/wilayas";
 import { normalizePhone } from "@/lib/algeria/phone";
-import { SELLER_COOKIE, endSession, startSession, verifyPassword } from "@/lib/auth";
+import { SELLER_COOKIE, endSession, hashPassword, startSession, verifyPassword } from "@/lib/auth";
 import { getOffers, getProductById, uniqueSlug } from "@/lib/catalog";
 import { getEnv } from "@/lib/db";
 import { copyStoreMedia, deleteStoreMedia } from "@/lib/media";
@@ -65,8 +66,40 @@ export async function login(_prev: LoginState, form: FormData): Promise<LoginSta
     .bind(store.id)
     .first<{ password_hash: string; owner_phone: string }>();
   if (!row || normalizePhone(row.owner_phone) !== phone || !(await verifyPassword(password, row.password_hash))) return bad;
-  await startSession(SELLER_COOKIE, { role: "seller", storeId: store.id });
-  redirect("/dashboard");
+  await startSession(SELLER_COOKIE, { role: "seller", storeId: store.id, v: store.session_version });
+  redirect(store.must_change_password === 1 ? "/dashboard/password" : "/dashboard");
+}
+
+// ---------------------------------------------------------------- password
+
+export type PasswordState = { error?: Msg; field?: string };
+
+/** Current password + new one twice. Logs out every other device (session_version + 1). */
+export async function changePassword(_prev: PasswordState, form: FormData): Promise<PasswordState> {
+  const { store, db } = await requireSeller({ passwordScreen: true });
+  const current = String(form.get("current") ?? "");
+  const next = String(form.get("new") ?? "");
+  const confirm = String(form.get("confirm") ?? "");
+  const row = await db.prepare("SELECT password_hash FROM stores WHERE id = ?").bind(store.id).first<{ password_hash: string }>();
+  if (!row || !(await verifyPassword(current, row.password_hash)))
+    return { field: "current", error: { fr: "Mot de passe actuel incorrect", ar: "كلمة السر الحالية غير صحيحة" } };
+  if (next.length < 8 || next.length > 128)
+    return { field: "new", error: { fr: "8 caractères minimum", ar: "8 أحرف على الأقل" } };
+  if (next !== confirm)
+    return { field: "confirm", error: { fr: "Les deux mots de passe ne sont pas identiques", ar: "كلمتا السر غير متطابقتين" } };
+  if (next === current)
+    return { field: "new", error: { fr: "Choisissez un mot de passe différent de l'actuel", ar: "اختر كلمة سر مختلفة عن الحالية" } };
+
+  const version = store.session_version + 1;
+  await db
+    .prepare(
+      `UPDATE stores SET password_hash = ?, must_change_password = 0, password_changed_at = datetime('now'), session_version = ?
+       WHERE id = ?`,
+    )
+    .bind(await hashPassword(next), version, store.id)
+    .run();
+  await startSession(SELLER_COOKIE, { role: "seller", storeId: store.id, v: version }); // keep this device logged in
+  redirect("/dashboard?password=changed");
 }
 
 export async function logout() {
@@ -269,8 +302,8 @@ export async function saveDelivery(_prev: SimpleState, form: FormData): Promise<
         return { error: { fr: `Wilaya ${w} : prix invalide`, ar: `الولاية ${w}: سعر غير صالح` } };
     rows.push({ w, home, desk });
   }
-  await db.batch(
-    rows.map((r) =>
+  await db.batch([
+    ...rows.map((r) =>
       db
         .prepare(
           `INSERT INTO delivery_prices (store_id, wilaya, home_price, desk_price) VALUES (?, ?, ?, ?)
@@ -278,38 +311,61 @@ export async function saveDelivery(_prev: SimpleState, form: FormData): Promise<
         )
         .bind(store.id, r.w, r.home, r.desk),
     ),
-  );
+    db.prepare("UPDATE stores SET delivery_checked = 1 WHERE id = ?").bind(store.id), // setup checklist
+  ]);
   revalidatePath("/", "layout");
   return { ok: true };
 }
 
 // ---------------------------------------------------------------- settings
 
+const HEX = /^#[0-9a-fA-F]{6}$/;
 export async function saveSettings(_prev: SimpleState, form: FormData): Promise<SimpleState> {
-  const { store, db } = await requireSeller();
-  const name = String(form.get("name") ?? "").replace(/\s+/g, " ").trim();
+  const { store, db, host } = await requireSeller();
+  const str = (k: string) => String(form.get(k) ?? "");
+  const name = str("name").replace(/\s+/g, " ").trim();
   const lang = form.get("lang") === "fr" ? "fr" : "ar";
-  const design = String(form.get("design"));
-  const color = String(form.get("primary_color") ?? "");
-  const waRaw = String(form.get("whatsapp") ?? "").trim();
-  const meta = String(form.get("meta_pixel_id") ?? "").trim();
-  const tiktok = String(form.get("tiktok_pixel_id") ?? "").trim();
+  const design = str("design");
+  const primary = str("primary_color");
+  const accent = str("accent_color");
+  const logoKey = str("logo_key").trim() || null;
+  const announcement = str("announcement").replace(/\s+/g, " ").trim();
+  const announcementOn = form.get("announcement_on") === "1";
+  const policyRaw = str("policy").replace(/\r\n?/g, "\n").trim();
+  const waRaw = str("whatsapp").trim();
+  const meta = str("meta_pixel_id").trim();
+  const tiktok = str("tiktok_pixel_id").trim();
   const whatsapp = waRaw ? normalizePhone(waRaw) : null;
+  const err = (fr: string, ar: string): SimpleState => ({ error: { fr, ar } });
 
-  if (name.length < 2 || name.length > 60) return { error: { fr: "Nom de la boutique : 2 à 60 caractères", ar: "اسم المتجر: من 2 إلى 60 حرفا" } };
-  if (!DESIGNS.some((d) => d.id === design)) return { error: { fr: "Design inconnu", ar: "تصميم غير معروف" } };
-  if (!/^#[0-9a-fA-F]{6}$/.test(color)) return { error: { fr: "Couleur invalide", ar: "لون غير صالح" } };
-  if (waRaw && !whatsapp) return { error: { fr: "Numéro WhatsApp invalide", ar: "رقم واتساب غير صالح" } };
-  if (meta && !/^\d{5,20}$/.test(meta)) return { error: { fr: "ID Pixel Meta : chiffres uniquement", ar: "معرف بيكسل ميتا: أرقام فقط" } };
-  if (tiktok && !/^[A-Za-z0-9]{5,40}$/.test(tiktok)) return { error: { fr: "ID Pixel TikTok invalide", ar: "معرف بيكسل تيك توك غير صالح" } };
+  if (name.length < 2 || name.length > 60) return err("Nom de la boutique : 2 à 60 caractères", "اسم المتجر: من 2 إلى 60 حرفا");
+  if (!DESIGNS.some((d) => d.id === design)) return err("Design inconnu", "تصميم غير معروف");
+  if (!HEX.test(primary) || !HEX.test(accent)) return err("Couleur invalide", "لون غير صالح");
+  if (logoKey && !storeKeyRe(store.id).test(logoKey)) return err("Logo invalide", "الشعار غير صالح");
+  if (announcement.length > 120) return err("Bandeau : 120 caractères maximum", "الشريط: 120 حرفا كحد أقصى");
+  if (announcementOn && !announcement) return err("Écrivez le texte du bandeau ou désactivez-le", "اكتب نص الشريط أو أوقفه");
+  if (policyRaw.length > 5000) return err("Texte livraison et retours : 5000 caractères maximum", "نص التوصيل والإرجاع: 5000 حرف كحد أقصى");
+  if (waRaw && !whatsapp) return err("Numéro WhatsApp invalide", "رقم واتساب غير صالح");
+  if (meta && !/^\d{5,20}$/.test(meta)) return err("ID Pixel Meta : chiffres uniquement", "معرف بيكسل ميتا: أرقام فقط");
+  if (tiktok && !/^[A-Za-z0-9]{5,40}$/.test(tiktok)) return err("ID Pixel TikTok invalide", "معرف بيكسل تيك توك غير صالح");
+
+  // Empty or unchanged default text -> NULL, so it keeps following the store language
+  const policy = !policyRaw || policyRaw === DEFAULT_POLICY.ar.trim() || policyRaw === DEFAULT_POLICY.fr.trim() ? null : policyRaw;
 
   await db
     .prepare(
-      `UPDATE stores SET name = ?, lang = ?, design = ?, primary_color = ?, whatsapp = ?, meta_pixel_id = ?, tiktok_pixel_id = ?
+      `UPDATE stores SET name = ?, lang = ?, design = ?, primary_color = ?, accent_color = ?, logo_key = ?,
+              announcement = ?, announcement_on = ?, policy = ?, whatsapp = ?, meta_pixel_id = ?, tiktok_pixel_id = ?
        WHERE id = ?`,
     )
-    .bind(name, lang, design, color.toLowerCase(), whatsapp, meta || null, tiktok || null, store.id)
+    .bind(
+      name, lang, design, primary.toLowerCase(), accent.toLowerCase(), logoKey,
+      announcement, announcementOn ? 1 : 0, policy, whatsapp, meta || null, tiktok || null,
+      store.id,
+    )
     .run();
-  revalidatePath("/", "layout");
+  // Old logo replaced or removed -> delete its R2 file
+  if (store.logo_key && store.logo_key !== logoKey) await deleteUnusedMedia(db, store.id, [store.logo_key]);
+  revalidatePath(`/s/${encodeURIComponent(host)}`, "layout");
   return { ok: true };
 }

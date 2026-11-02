@@ -77,6 +77,16 @@ export const WILAYAS: readonly Wilaya[] = [
 
 export const WILAYA_COUNT = WILAYAS.length; // 69
 
+/**
+ * Southern wilayas, for the "apply to the south" helper on the delivery page (couriers price them
+ * higher). It is only a shortcut: the seller can still change any wilaya by hand afterwards.
+ */
+export const SOUTH_WILAYAS: readonly number[] = [
+  1, 3, 7, 8, 11, 30, 32, 33, 37, 39, 47, // Adrar … Ghardaïa
+  49, 50, 51, 52, 53, 54, 55, 56, 57, 58, // created in 2019
+  59, 60, 62, // Aflou, El Abiodh Sidi Cheikh, El Kantara (2025)
+];
+
 export function isWilaya(code: number): boolean {
   return Number.isInteger(code) && code >= 1 && code <= WILAYA_COUNT;
 }

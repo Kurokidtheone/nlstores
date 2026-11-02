@@ -8,7 +8,8 @@ import { getDb, getEnv } from "./db";
 import type { Store } from "./types";
 
 const STORE_COLUMNS =
-  "s.id, s.slug, s.name, s.lang, s.design, s.primary_color, s.whatsapp, s.meta_pixel_id, s.tiktok_pixel_id, s.owner_name, s.owner_phone, s.status, s.expires_at, s.created_at";
+  "s.id, s.slug, s.name, s.lang, s.design, s.primary_color, s.whatsapp, s.meta_pixel_id, s.tiktok_pixel_id, s.owner_name, s.owner_phone, s.status, s.expires_at, s.created_at, " +
+  "s.logo_key, s.accent_color, s.announcement, s.announcement_on, s.policy, s.must_change_password, s.password_changed_at, s.session_version, s.delivery_checked";
 
 export const GRACE_DAYS = 7;
 
@@ -41,22 +42,28 @@ export function storeState(store: Pick<Store, "status" | "expires_at">, now = Da
 
 export const isOpen = (s: StoreState) => s === "active" || s === "grace";
 
-/** True when the visitor is logged in as the seller of this store (no redirect) */
+/**
+ * True when the visitor is logged in as the seller of this store (no redirect).
+ * A password change bumps session_version, which logs out every other device.
+ */
 export async function isSellerOf(store: Store): Promise<boolean> {
   const s = await readSession(SELLER_COOKIE);
-  return !!s && s.role === "seller" && s.storeId === store.id;
+  return !!s && s.role === "seller" && s.storeId === store.id && (s.v ?? 0) === store.session_version;
 }
 
 /**
  * First line of every seller page and server action.
  * Returns the store of the current host only if the seller session belongs to it.
+ * While must_change_password = 1, everything redirects to the change-password screen
+ * (only that screen and its action pass { passwordScreen: true }).
  */
-export async function requireSeller(): Promise<{ store: Store; db: D1Database; host: string }> {
+export async function requireSeller(opts: { passwordScreen?: boolean } = {}): Promise<{ store: Store; db: D1Database; host: string }> {
   const host = await currentHost();
   const store = await getStoreByHost(host);
   if (!store) notFound();
   if (!(await isSellerOf(store))) redirect("/dashboard/login");
   if (!isOpen(storeState(store))) redirect("/dashboard/login?expired=1");
+  if (store.must_change_password === 1 && !opts.passwordScreen) redirect("/dashboard/password");
   return { store, db: await getDb(), host };
 }
 

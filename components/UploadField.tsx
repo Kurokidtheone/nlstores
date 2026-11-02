@@ -4,15 +4,29 @@ import { useRef, useState } from "react";
 const MAX_SIDE = 1600;
 const QUALITY = 0.82;
 
-/** Resize + re-encode in the browser so phones upload ~200 KB instead of 5 MB */
-async function compress(file: File): Promise<Blob> {
+const LOGO_SIDE = 512;
+
+/**
+ * Resize + re-encode in the browser so phones upload ~200 KB instead of 5 MB.
+ * square: centre-crop to a 512×512 square (logos).
+ */
+async function compress(file: File, square: boolean): Promise<Blob> {
   const bitmap = await createImageBitmap(file).catch(() => null);
   if (!bitmap) return file;
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const ctx = canvas.getContext("2d")!;
+  if (square) {
+    const side = Math.min(bitmap.width, bitmap.height);
+    canvas.width = canvas.height = Math.min(LOGO_SIDE, side);
+    ctx.fillStyle = "#fff"; // transparent PNG logos -> white background
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, canvas.width, canvas.height);
+  } else {
+    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  }
   bitmap.close();
   const toBlob = (type: string) => new Promise<Blob | null>((r) => canvas.toBlob(r, type, QUALITY));
   // Old Safari silently returns PNG for webp: fall back to JPEG then
@@ -21,8 +35,8 @@ async function compress(file: File): Promise<Blob> {
   return (await toBlob("image/jpeg")) ?? file;
 }
 
-async function upload(file: File): Promise<string> {
-  const blob = await compress(file);
+async function upload(file: File, square: boolean): Promise<string> {
+  const blob = await compress(file, square);
   const form = new FormData();
   form.append("file", blob, file.name);
   const res = await fetch("/api/upload", { method: "POST", body: form });
@@ -38,10 +52,12 @@ type Props = {
   /** how many more files are allowed */
   remaining?: number;
   label?: { fr: string; ar: string };
+  /** crop to a square (logo) */
+  square?: boolean;
 };
 
 /** Photo picker -> browser compression -> /api/upload (R2). Returns R2 keys. */
-export function UploadField({ onUploaded, multiple = false, remaining = 10, label = { fr: "Ajouter des photos", ar: "إضافة صور" } }: Props) {
+export function UploadField({ onUploaded, multiple = false, remaining = 10, label = { fr: "Ajouter des photos", ar: "إضافة صور" }, square = false }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +69,7 @@ export function UploadField({ onUploaded, multiple = false, remaining = 10, labe
     for (let i = 0; i < files.length; i++) {
       setProgress(`${i + 1}/${files.length}`);
       try {
-        onUploaded(await upload(files[i]));
+        onUploaded(await upload(files[i], square));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erreur");
       }

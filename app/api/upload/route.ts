@@ -8,7 +8,7 @@ const MAX_BYTES = 3 * 1024 * 1024; // photos are already compressed in the brows
 // Seller image upload -> R2 at stores/<storeId>/<uuid>.<ext>. Only the logged-in seller of this host.
 export async function POST(req: Request) {
   const store = await currentStore();
-  if (!store || !(await isSellerOf(store)) || !isOpen(storeState(store))) {
+  if (!store || !(await isSellerOf(store)) || !isOpen(storeState(store)) || store.must_change_password === 1) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const form = await req.formData().catch(() => null);

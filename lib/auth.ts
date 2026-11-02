@@ -45,8 +45,9 @@ export const SELLER_COOKIE = "nls_seller";
 export const ADMIN_COOKIE = "nls_admin";
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
-export type Session = { role: "seller"; storeId: number; exp: number } | { role: "admin"; exp: number };
-type NewSession = { role: "seller"; storeId: number } | { role: "admin" };
+/** v = stores.session_version at login time (a password change invalidates older sessions) */
+export type Session = { role: "seller"; storeId: number; v?: number; exp: number } | { role: "admin"; exp: number };
+type NewSession = { role: "seller"; storeId: number; v: number } | { role: "admin" };
 
 async function hmac(data: string): Promise<string> {
   const secret = (await getEnv()).SESSION_SECRET;

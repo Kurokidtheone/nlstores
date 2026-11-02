@@ -15,6 +15,16 @@ export type Store = {
   status: "active" | "suspended";
   expires_at: string;
   created_at: string;
+  // 0002_store_self_service
+  logo_key: string | null;
+  accent_color: string;
+  announcement: string;
+  announcement_on: number;
+  policy: string | null;
+  must_change_password: number;
+  password_changed_at: string | null;
+  session_version: number;
+  delivery_checked: number;
 };
 
 export type VariantGroup = { name: string; options: string[] };

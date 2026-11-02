@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Bi, BiInline, FieldError } from "@/components/dash/ui";
+import { Switch } from "@/components/dash/Switch";
 import { UploadField } from "@/components/UploadField";
 import { VideoEmbed } from "@/designs/shared/VideoEmbed";
 import { formatDA } from "@/lib/format";
@@ -608,21 +609,6 @@ function Field({
       {hint && <p className="mt-1 text-xs text-gray-500">{hint}</p>}
       <FieldError msg={error} />
     </div>
-  );
-}
-
-function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative h-8 w-14 flex-none rounded-full transition ${checked ? "bg-green-600" : "bg-gray-300"}`}
-    >
-      <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${checked ? "left-7" : "left-1"}`} />
-    </button>
   );
 }
 

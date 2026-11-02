@@ -6,10 +6,17 @@ import { maison } from "./maison";
 import { style } from "./style";
 import { tech } from "./tech";
 
+/** primary = buttons, prices, links. accent = announcement bar, badges, footer (white text on it). */
+export type Palette = { fr: string; ar: string; primary: string; accent: string };
+
 export type Design = {
   id: string;
   name: string;
+  /** one-line description for the design picker */
+  tagline: { fr: string; ar: string };
   defaultColor: string;
+  /** 6 ready-made color pairs; the first one is the default */
+  palettes: Palette[];
   options: {
     /** product photo shape */
     gallery: "square" | "portrait";

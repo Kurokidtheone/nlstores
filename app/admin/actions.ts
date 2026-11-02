@@ -52,6 +52,7 @@ export async function createStore(_prev: AdminState, form: FormData): Promise<Ad
   if (!DESIGNS.some((d) => d.id === design)) return { error: { fr: "Design inconnu", ar: "تصميم غير معروف" } };
   if (custom && !/^(?:[a-z0-9-]+\.)+[a-z]{2,}$/.test(custom)) return { error: { fr: "Domaine personnalisé invalide", ar: "النطاق غير صالح" } };
 
+  const palette = getDesign(design).palettes[0];
   const hostname = `${slug}.${env.ROOT_DOMAIN}`;
   const taken = await db
     .prepare("SELECT 1 FROM stores WHERE slug = ? UNION SELECT 1 FROM domains WHERE hostname IN (?, ?)")
@@ -61,10 +62,11 @@ export async function createStore(_prev: AdminState, form: FormData): Promise<Ad
 
   const row = await db
     .prepare(
-      `INSERT INTO stores (slug, name, lang, design, primary_color, whatsapp, owner_name, owner_phone, password_hash, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      // must_change_password = 1: the password you give the seller is temporary, they choose their own at first login
+      `INSERT INTO stores (slug, name, lang, design, primary_color, accent_color, whatsapp, owner_name, owner_phone, password_hash, expires_at, must_change_password)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1) RETURNING id`,
     )
-    .bind(slug, name, lang, design, getDesign(design).defaultColor, phone, ownerName, phone, await hashPassword(password), addYear(""))
+    .bind(slug, name, lang, design, palette.primary, palette.accent, phone, ownerName, phone, await hashPassword(password), addYear(""))
     .first<{ id: number }>();
   const storeId = row!.id;
   await db.prepare("INSERT INTO domains (hostname, store_id, kind) VALUES (?, ?, 'subdomain')").bind(hostname, storeId).run();

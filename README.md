@@ -29,17 +29,20 @@ nl-stores/
 │   │   │   ├── layout.tsx        #   store lookup, expiry check, RTL/LTR, colors, pixels
 │   │   │   ├── page.tsx          #   home: 1 product -> its landing page, else catalog
 │   │   │   ├── p/[slug]/         #   product landing page + order form (hidden = seller preview only)
+│   │   │   ├── policy/           #   delivery & returns text (linked in the footer)
 │   │   │   └── thank-you/        #   Purchase event (Meta + TikTok)
 │   │   └── dashboard/            # SELLER DASHBOARD (on the store's own domain)
 │   │       ├── actions.ts        #   ALL seller server actions (requireSeller + store_id on every query)
 │   │       ├── login/
+│   │       ├── password/         #   change password (forced while must_change_password = 1)
 │   │       └── (app)/            #   logged-in pages + bottom nav
-│   │           ├── page.tsx      #     home stats
+│   │           ├── page.tsx      #     home stats + "store setup" checklist
 │   │           ├── orders/       #     call, "no answer" counter, status, block number
 │   │           ├── products/     #     list (order up/down, empty state), new/ (quick add)
 │   │           │   └── [id]/     #     FULL PRODUCT EDITOR (ProductEditor.tsx)
 │   │           ├── delivery/     #     home / stop desk price per wilaya (69)
-│   │           └── settings/     #     name, language, design, color, WhatsApp, pixel IDs
+│   │           ├── settings/     #     logo, design + preview, palettes, announcement bar, policy, language, WhatsApp, pixels
+│   │           └── help/         #     tutorial videos (lib/help.ts) + WhatsApp support
 │   ├── admin/                    # OWNER PANEL (admin.yourbrand.com)
 │   │   ├── actions.ts            #   create store, renew (+1 year), suspend
 │   │   ├── page.tsx              #   all stores, expiry, WhatsApp renewal reminder
@@ -51,7 +54,7 @@ nl-stores/
 ├── designs/
 │   ├── registry.ts               # design list; a design = options + CSS, not new code
 │   ├── glow/ maison/ style/ bebe/ tech/
-│   └── shared/                   # ProductLanding, OrderForm, ProductGrid, StoreHeader, Gallery, VideoEmbed
+│   └── shared/                   # ProductLanding, OrderForm, ProductGrid, StoreHeader, StoreFooter, AnnouncementBar, Gallery, VideoEmbed
 ├── components/
 │   ├── Pixels.tsx                # Meta + TikTok base code, Purchase event
 │   ├── UploadField.tsx           # photo picker, browser compression -> /api/upload
@@ -63,13 +66,15 @@ nl-stores/
 │   ├── catalog.ts                # products, offers, delivery prices (read helpers)
 │   ├── media.ts                  # R2 delete / copy, scoped to one store
 │   ├── video.ts                  # YouTube / Facebook link -> embed
+│   ├── policy.ts                 # default delivery & returns text (AR + FR)
+│   ├── help.ts                   # tutorial video links + support WhatsApp number
 │   ├── auth.ts                   # PBKDF2 passwords + signed session cookie (Web Crypto)
 │   ├── cloudflare-domains.ts     # Cloudflare for SaaS custom hostnames
 │   ├── algeria/wilayas.ts        # 69 wilayas, FR + AR
 │   ├── algeria/phone.ts          # 05/06/07 validation, wa.me links
 │   └── i18n.ts                   # storefront text AR / FR
 ├── db/
-│   ├── migrations/0001_init.sql  # schema; every change = a NEW numbered file
+│   ├── migrations/               # 0001_init, 0002_store_self_service; every change = a NEW numbered file
 │   ├── seed-demo.sql             # demo store for local dev (demo.localhost)
 │   └── seeds/demo.sql            # demo store for the live D1 (paste in the D1 console)
 ├── docs/screenshots/             # 390px screenshots from the automated browser tests
@@ -91,6 +96,7 @@ npm run dev
 - Seller dashboard: http://demo.localhost:3000/dashboard — `0555000000` / `demo1234`
 - Admin: http://admin.localhost:3000 — password from `ADMIN_PASSWORD` in `.dev.vars`
 - A store you create in admin with sub-domain `abc` opens at http://abc.localhost:3000
+  (the password you give is temporary: the seller must choose their own at first login)
 
 Database changes: add `db/migrations/0002_what_changed.sql`, run `npm run db:migrate:local`.
 Never edit a migration that is already applied.
@@ -119,7 +125,8 @@ Before going live on a domain:
 - [ ] Rate-limit `POST /api/orders` and the login forms (Cloudflare WAF rate-limiting rule)
 - [x] Product edit page: variants, offers, landing sections, sort
 - [ ] Orders export (CSV / Excel)
-- [ ] Seller: change password, logo upload
+- [x] Seller: change password, logo upload, settings, setup checklist
+- [ ] Paste the 4 tutorial video links in `lib/help.ts`
 - [ ] Daily D1 backup (`wrangler d1 export` on a schedule)
 - [ ] Courier wilaya codes: Yalidine / ZR may still use the 58 old codes; map them in the courier add-on
 - [ ] Verify wilayas 59–69 numbering against the Journal officiel list

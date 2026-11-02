@@ -23,7 +23,7 @@ export function ProductLanding({ lang, design, product: p, offers, delivery, pre
   const discount = p.old_price ? Math.round((1 - p.price / p.old_price) * 100) : 0;
 
   return (
-    <article className="mx-auto max-w-xl pb-28">
+    <article className="mx-auto max-w-xl pb-6">
       {previewHidden && <p className="bg-amber-100 px-4 py-2 text-center text-sm font-semibold text-amber-900">{tr("preview_hidden")}</p>}
 
       <div className="px-4 pt-4">
@@ -35,7 +35,7 @@ export function ProductLanding({ lang, design, product: p, offers, delivery, pre
         <p className="flex flex-wrap items-baseline gap-x-3">
           <bdi className="store-brand text-3xl font-black">{formatDA(p.price, lang)}</bdi>
           {p.old_price && <bdi className="text-lg text-[var(--muted)] line-through">{formatDA(p.old_price, lang)}</bdi>}
-          {discount > 0 && <span className="rounded-full bg-red-600 px-2 py-0.5 text-sm font-bold text-white">-{discount}%</span>}
+          {discount > 0 && <span className="store-accent rounded-full px-2 py-0.5 text-sm font-bold">-{discount}%</span>}
         </p>
         {p.description && <p className="whitespace-pre-line leading-relaxed text-[var(--muted)]">{p.description}</p>}
       </header>
@@ -107,7 +107,7 @@ export function ProductLanding({ lang, design, product: p, offers, delivery, pre
         </section>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-[var(--card)]/95 p-3 backdrop-blur">
+      <div className="store-fixed-cta fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-[var(--card)]/95 p-3 backdrop-blur">
         <a href="#order" className="store-btn mx-auto flex min-h-13 max-w-xl items-center justify-center gap-2 text-lg">
           {tr("order_now")} · <bdi>{formatDA(p.price, lang)}</bdi>
         </a>

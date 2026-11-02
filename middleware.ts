@@ -8,6 +8,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const ROOT = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "localhost";
 const ADMIN = process.env.NEXT_PUBLIC_ADMIN_HOST ?? `admin.${ROOT}`;
 const SALES_URL = process.env.NEXT_PUBLIC_SALES_URL ?? "https://example.com";
+const PREVIEW_HEADER = "x-nls-preview";
 
 export function middleware(req: NextRequest) {
   const host = (req.headers.get("host") ?? "").split(":")[0].toLowerCase();
@@ -29,7 +30,16 @@ export function middleware(req: NextRequest) {
   }
 
   url.pathname = `/s/${encodeURIComponent(host)}${path === "/" ? "" : path}`;
-  return NextResponse.rewrite(url);
+  // Design preview from Settings (?preview_design=maison&preview_colors=a16207,422006).
+  // Passed to the store layout as a header; the layout only applies it for the logged-in seller.
+  const headers = new Headers(req.headers);
+  headers.delete(PREVIEW_HEADER); // never trust one sent by the browser
+  const design = url.searchParams.get("preview_design");
+  if (design && /^[a-z]{2,20}$/.test(design)) {
+    const colors = url.searchParams.get("preview_colors") ?? "";
+    headers.set(PREVIEW_HEADER, /^[0-9a-f]{6},[0-9a-f]{6}$/i.test(colors) ? `${design};${colors}` : design);
+  }
+  return NextResponse.rewrite(url, { request: { headers } });
 }
 
 export const config = {
