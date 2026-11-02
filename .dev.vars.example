@@ -1,0 +1,9 @@
+# Local secrets for `npm run dev`. Copy to .dev.vars (never commit .dev.vars).
+SESSION_SECRET=change-me-to-a-long-random-string-at-least-32-chars
+ADMIN_PASSWORD=admin1234
+# Optional: only needed to create custom client domains through the API
+CF_API_TOKEN=
+
+# Local overrides of wrangler.jsonc vars
+ROOT_DOMAIN=localhost
+ADMIN_HOST=admin.localhost

@@ -33,6 +33,8 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Skip Next internals, API routes and static files (anything with a dot)
-  matcher: ["/((?!_next/|api/|favicon.ico|.*\\..*).*)"],
+  // Skip Next internals, API routes and static files (anything with a dot).
+  // /s/* and /admin/* are listed too: internal paths contain a dot (/s/demo.localhost/...)
+  // and would otherwise skip the "not reachable directly" check above.
+  matcher: ["/((?!_next/|api/|favicon.ico|.*\\..*).*)", "/s/:path*", "/admin/:path*"],
 };

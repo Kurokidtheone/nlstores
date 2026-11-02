@@ -1,6 +1,6 @@
 # Rules for every session
 
-Next Level Stores: one Next.js app on Cloudflare (Workers + D1 + R2) serves many COD stores for Algerian sellers. Read README.md for the map of the code.
+Next Level Stores: one Next.js app on Cloudflare (Workers + D1 + R2) serves many COD stores for Algerian sellers. Read README.md for the map of the code. Seller pages live in `app/s/[host]/dashboard/(app)/`, seller writes in `app/s/[host]/dashboard/actions.ts`.
 
 1. **Multi-tenant.** Every query on a store table filters by `store_id`. Seller pages and actions always start with `requireSeller()`; admin ones with `requireAdmin()`. Never take a `store_id` from the browser.
 2. **Never trust the browser with money.** Prices, totals and delivery fees sent by the browser are ignored; recompute them from the database (see `lib/orders.ts`).
@@ -13,9 +13,9 @@ Next Level Stores: one Next.js app on Cloudflare (Workers + D1 + R2) serves many
 9. **Workflow.** You run in Claude Code on the web; the owner has no terminal.
    1. Work on a branch.
    2. `npm install`.
-   3. `npm run db:local` (applies migrations, then the demo seed, to the LOCAL D1).
-   4. `npm run dev`.
-   5. Test the pages you changed yourself in a headless browser at 390px: stores at `demo.localhost:3000`, admin at `admin.localhost:3000`.
+   3. `cp .dev.vars.example .dev.vars && cp .env.example .env.local`, then `npm run db:local` (applies migrations, then the demo seed, to the LOCAL D1).
+   4. `NO_PROXY=localhost,.localhost,127.0.0.1 npm run dev` (the cloud sandbox proxy otherwise intercepts Next's internal calls to `*.localhost`).
+   5. Test the pages you changed yourself in a headless browser at 390px: stores at `demo.localhost:3000`, admin at `admin.localhost:3000` (Playwright: launch Chromium with `--host-resolver-rules=MAP *.localhost 127.0.0.1` and `--no-proxy-server`). Demo seller: `0555000000` / `demo1234`.
    6. Run `npm run typecheck` and `npm run build` and fix every error.
    7. Open a pull request with a summary, screenshots, and a "How to test on demo.&lt;domain&gt;" list.
    8. Never commit secrets, `.dev.vars` or `.env.local`.

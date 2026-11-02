@@ -1,0 +1,210 @@
+@import "tailwindcss";
+
+/* ---------- base tokens (every design overrides some of them) ---------- */
+:root {
+  --brand: #db2777; /* set per store from stores.primary_color */
+  --bg: #ffffff;
+  --card: #ffffff;
+  --text: #111827;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --soft: color-mix(in srgb, var(--brand) 8%, white);
+  --radius: 14px;
+  --btn-radius: 12px;
+  --font: system-ui, -apple-system, "Segoe UI", Tahoma, Roboto, "Noto Sans Arabic", sans-serif;
+  --heading-font: var(--font);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- designs ---------- */
+[data-design="glow"] {
+  --bg: #fff7fb;
+  --radius: 20px;
+  --btn-radius: 999px;
+}
+[data-design="maison"] {
+  --bg: #faf7f2;
+  --card: #fffdf9;
+  --line: #e7dfd3;
+  --radius: 10px;
+  --btn-radius: 10px;
+  --heading-font: Georgia, "Times New Roman", "Noto Naskh Arabic", serif;
+}
+[data-design="style"] {
+  --bg: #ffffff;
+  --radius: 0px;
+  --btn-radius: 0px;
+  --heading-font: "Helvetica Neue", Arial, var(--font);
+}
+[data-design="style"] .store-heading {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+[data-design="bebe"] {
+  --bg: #f0f9ff;
+  --radius: 24px;
+  --btn-radius: 18px;
+}
+[data-design="tech"] {
+  --bg: #f8fafc;
+  --line: #dbe3ee;
+  --radius: 8px;
+  --btn-radius: 8px;
+}
+
+/* ---------- shared storefront classes ---------- */
+.store {
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+}
+.store-heading {
+  font-family: var(--heading-font);
+}
+.store-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.store-btn {
+  background: var(--brand);
+  color: #fff;
+  border-radius: var(--btn-radius);
+  font-weight: 700;
+}
+.store-btn:disabled {
+  opacity: 0.6;
+}
+.store-brand {
+  color: var(--brand);
+}
+.store-soft {
+  background: var(--soft);
+}
+.store-img {
+  border-radius: var(--radius);
+}
+.store-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: min(var(--btn-radius), 14px);
+  background: #fff;
+  padding: 0.75rem 0.9rem;
+  font-size: 16px; /* no zoom on iOS */
+}
+.store-input:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: 0;
+}
+.store-option[aria-pressed="true"],
+.store-option:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--soft);
+  box-shadow: 0 0 0 1px var(--brand);
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+.store-pulse {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .store-pulse {
+    animation: none;
+  }
+}
+
+/* ---------- seller dashboard / admin ---------- */
+.dash {
+  --brand: #4f46e5;
+  background: #f3f4f6;
+  color: #111827;
+  min-height: 100dvh;
+}
+.dash-input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.75rem 0.9rem;
+  font-size: 16px;
+  min-height: 48px;
+}
+.dash-input:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: 0;
+  border-color: transparent;
+}
+.dash-input[aria-invalid="true"] {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+.dash-btn {
+  min-height: 52px;
+  border-radius: 14px;
+  font-weight: 700;
+  padding: 0 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.dash-btn-primary {
+  background: var(--brand);
+  color: #fff;
+}
+.dash-btn-ghost {
+  background: #fff;
+  border: 1px solid #d1d5db;
+  color: #111827;
+}
+.dash-btn-danger {
+  background: #fff;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+.dash-btn:disabled {
+  opacity: 0.5;
+}
+.dash-card {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+}
+.dash-icon-btn {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+.dash-icon-btn:disabled {
+  opacity: 0.35;
+}
+.ar {
+  font-family: var(--font);
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+/* Dashboard: the Arabic line sits right under its French label */
+.dash .ar {
+  text-align: left;
+}
