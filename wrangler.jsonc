@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nl-stores",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-08-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "stores-db",
+      // Create with: npx wrangler d1 create stores-db  -> paste the id here
+      "database_id": "REPLACE_WITH_D1_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      // Create with: npx wrangler r2 bucket create stores-media
+      "bucket_name": "stores-media"
+    }
+  ],
+  "vars": {
+    "ROOT_DOMAIN": "yourbrand.com",
+    "ADMIN_HOST": "admin.yourbrand.com",
+    "CF_ZONE_ID": "REPLACE_WITH_ZONE_ID"
+  }
+  // Secrets (never in this file): npx wrangler secret put SESSION_SECRET
+  //                               npx wrangler secret put CF_API_TOKEN
+  //                               npx wrangler secret put ADMIN_PASSWORD
+}
