@@ -1,144 +1,114 @@
 import Link from "next/link";
 import { PageTitle } from "@/components/dash/ui";
-import { wilayaName } from "@/lib/algeria/wilayas";
+import { BILLING } from "@/lib/billing";
 import { formatDA } from "@/lib/format";
-import { waLink } from "@/lib/algeria/phone";
-import { requireAdmin, storeState } from "@/lib/tenant";
-import type { Store } from "@/lib/types";
-import { adminLogout, checkDomain, renewStore, toggleSuspend } from "./actions";
-import { ResendWelcome } from "./ResendWelcome";
+import { REMINDER_LABEL, reminderMessage, type ReminderKind } from "@/lib/renewal";
+import { sheetConfigured } from "@/lib/sheet-sync";
+import { algeriaDate, daysLeft, dmy, lifecycleOf, storeState } from "@/lib/store-state";
+import { requireAdmin } from "@/lib/tenant";
+import type { Lang } from "@/lib/types";
+import { DailyJobButton, DeleteStoreItem, ReminderItem, SheetActions } from "./TodayParts";
 
-type Row = Store & { orders_30d: number; pay_amount: number | null; pay_method: string | null; pay_receipt: string | null; pay_date: string | null };
-type DomainRow = { store_id: number; hostname: string; kind: string; status: string; last_error: string | null; checked_at: string | null };
+type S = { id: number; slug: string; name: string; owner_name: string; owner_phone: string; lang: Lang; status: "active" | "suspended"; expires_at: string; custom: number };
+type R = S & { rid: number; kind: ReminderKind; created_at: string };
 
-const STATE = {
-  active: "bg-green-100 text-green-800",
-  grace: "bg-amber-100 text-amber-800",
-  expired: "bg-red-100 text-red-800",
-  suspended: "bg-gray-200 text-gray-700",
-};
-const DOMAIN = {
-  active: { label: "actif", cls: "bg-green-100 text-green-800" },
-  pending: { label: "en attente", cls: "bg-amber-100 text-amber-800" },
-  to_retry: { label: "à réessayer", cls: "bg-red-100 text-red-800" },
-} as Record<string, { label: string; cls: string }>;
-const METHOD: Record<string, string> = { ccp: "CCP", baridimob: "BaridiMob", chargily: "Chargily", cash: "Espèces" };
+// Admin home: what to do today (reminders to send, stores to delete) + key numbers
+export default async function Today() {
+  const { db, env } = await requireAdmin();
+  const now = Date.now();
+  const month = algeriaDate(now).slice(0, 7);
+  const monthStartUtc = new Date(Date.parse(`${month}-01T00:00:00Z`) - 3_600_000).toISOString().slice(0, 19).replace("T", " ");
+  const storeCols = `s.id, s.slug, s.name, s.owner_name, s.owner_phone, s.lang, s.status, s.expires_at,
+    EXISTS (SELECT 1 FROM domains d WHERE d.store_id = s.id AND d.kind = 'custom') AS custom`;
 
-export default async function AdminHome() {
-  const { db } = await requireAdmin();
-  const [{ results: stores }, { results: domains }] = await Promise.all([
+  const [{ results: stores }, { results: reminders }, revenue, queue, lastJob] = await Promise.all([
+    db.prepare(`SELECT ${storeCols} FROM stores s`).all<S>(),
     db
-      .prepare(
-        `SELECT s.*,
-                (SELECT COUNT(*) FROM orders o WHERE o.store_id = s.id AND o.created_at > datetime('now', '-30 days')) AS orders_30d,
-                p.amount AS pay_amount, p.method AS pay_method, p.receipt_key AS pay_receipt, p.created_at AS pay_date
-         FROM stores s
-         LEFT JOIN payments p ON p.id = (SELECT id FROM payments WHERE store_id = s.id ORDER BY created_at DESC, id DESC LIMIT 1)
-         ORDER BY s.expires_at`,
-      )
-      .all<Row>(),
-    db.prepare("SELECT store_id, hostname, kind, status, last_error, checked_at FROM domains ORDER BY kind DESC").all<DomainRow>(),
+      .prepare(`SELECT r.id AS rid, r.kind, r.created_at, ${storeCols} FROM renewal_reminders r JOIN stores s ON s.id = r.store_id WHERE r.status = 'pending' ORDER BY s.expires_at`)
+      .all<R>(),
+    db.prepare("SELECT COALESCE(SUM(amount), 0) AS n FROM payments WHERE created_at >= ?").bind(monthStartUtc).first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) AS n, MAX(last_error) AS err FROM sheet_sync_queue").first<{ n: number; err: string | null }>(),
+    db.prepare("SELECT created_at FROM admin_log WHERE action = 'daily_job' ORDER BY id DESC LIMIT 1").first<{ created_at: string }>(),
   ]);
+
+  const live = stores.filter((s) => s.status !== "suspended");
+  const counters = [
+    { label: "Boutiques actives", value: live.filter((s) => ["active", "grace"].includes(storeState(s))).length },
+    { label: "Renouvellements ce mois", value: live.filter((s) => algeriaDate(Date.parse(s.expires_at)).slice(0, 7) === month).length },
+    { label: "Expirées", value: stores.filter((s) => ["expired", "to_delete"].includes(lifecycleOf(s.expires_at))).length },
+    { label: "Encaissé ce mois", value: formatDA(revenue?.n ?? 0) },
+  ];
+  const toDelete = stores.filter((s) => lifecycleOf(s.expires_at) === "to_delete");
+  const storeUrl = (slug: string) => `https://${slug}.${env.ROOT_DOMAIN}`;
 
   return (
     <>
-      <PageTitle fr="Boutiques" ar="المتاجر">
-        <Link href="/stores/new" className="dash-btn dash-btn-primary !min-h-11 text-sm">➕ Nouvelle</Link>
-      </PageTitle>
-      <ul className="space-y-3">
-        {stores.map((s) => {
-          const state = storeState(s);
-          const days = Math.ceil((Date.parse(s.expires_at) - Date.now()) / 86_400_000);
-          const own = domains.filter((d) => d.store_id === s.id);
-          return (
-            <li key={s.id} className="dash-card space-y-3 p-4" data-testid={`store-${s.slug}`}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-bold">
-                    {s.name} {s.request_ref && <span className="text-xs font-normal text-gray-500">· {s.request_ref}</span>}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    {s.owner_name} · <span dir="ltr">{s.owner_phone}</span>
-                    {s.owner_wilaya ? ` · ${wilayaName(s.owner_wilaya, "fr")}` : ""}
-                    {s.facebook_url && (
-                      <>
-                        {" · "}
-                        <a href={s.facebook_url} target="_blank" rel="noopener" className="underline">Facebook</a>
-                      </>
-                    )}
-                  </p>
-                </div>
-                <span className={`flex-none rounded-full px-3 py-1 text-xs font-bold ${STATE[state]}`}>{state}</span>
-              </div>
+      <PageTitle fr="Aujourd'hui" ar="اليوم" />
+      <div className="grid grid-cols-2 gap-3">
+        {counters.map((c) => (
+          <div key={c.label} className="dash-card p-4">
+            <p className="text-2xl font-black" data-testid={`counter-${c.label}`}><bdi>{c.value}</bdi></p>
+            <p className="text-sm text-gray-600">{c.label}</p>
+          </div>
+        ))}
+      </div>
 
-              <ul className="space-y-1 text-sm">
-                {own.map((d) => (
-                  <li key={d.hostname} className="flex flex-wrap items-center gap-2">
-                    <span className="break-all font-mono text-xs">{d.hostname}</span>
-                    {d.kind === "custom" && (
-                      <>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${DOMAIN[d.status]?.cls ?? ""}`} data-testid="domain-status">{DOMAIN[d.status]?.label ?? d.status}</span>
-                        {d.status !== "active" && (
-                          <form action={checkDomain}>
-                            <input type="hidden" name="hostname" value={d.hostname} />
-                            <button className="rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold">↻ Vérifier maintenant</button>
-                          </form>
-                        )}
-                        {d.last_error && <span className="w-full text-xs text-gray-500">{d.last_error}{d.checked_at ? ` (${d.checked_at.slice(5, 16)})` : ""}</span>}
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
+      <h2 className="mb-2 mt-6 text-lg font-extrabold">📣 Rappels de renouvellement ({reminders.length})</h2>
+      {reminders.length === 0 ? (
+        <p className="dash-card p-4 text-sm text-gray-500">Rien à envoyer aujourd&apos;hui ✓</p>
+      ) : (
+        <ul className="space-y-3">
+          {reminders.map((r) => {
+            const d = daysLeft(r.expires_at, now);
+            const amount = r.custom ? BILLING.renewal.custom_domain : BILLING.renewal.standard;
+            return (
+              <ReminderItem
+                key={r.rid}
+                id={r.rid}
+                title={r.name}
+                subtitle={`${r.owner_name} · ${r.owner_phone} · fin ${dmy(r.expires_at)} (${d >= 0 ? `J-${d}` : `J+${-d}`}) · ${formatDA(amount)}`}
+                label={REMINDER_LABEL[r.kind]}
+                lang={r.lang}
+                phone={r.owner_phone}
+                message={reminderMessage({ lang: r.lang, ownerName: r.owner_name || r.name, storeName: r.name, storeUrl: storeUrl(r.slug), expiresAt: r.expires_at, daysLeft: d, amount })}
+              />
+            );
+          })}
+        </ul>
+      )}
 
-              <p className="text-sm text-gray-600">
-                Expire le {s.expires_at.slice(0, 10)} ({days} j) · {s.orders_30d} commandes / 30 j
-                {s.pay_amount && (
-                  <>
-                    {" · "}payé <bdi>{formatDA(s.pay_amount)}</bdi> ({METHOD[s.pay_method ?? ""] ?? s.pay_method})
-                    {s.pay_receipt && (
-                      <>
-                        {" · "}
-                        <a href={`/api/admin/media/${s.pay_receipt}`} target="_blank" rel="noopener" className="underline">reçu</a>
-                      </>
-                    )}
-                  </>
-                )}
-              </p>
+      {toDelete.length > 0 && (
+        <>
+          <h2 className="mb-2 mt-6 text-lg font-extrabold">🗑️ À supprimer ({toDelete.length})</h2>
+          <p className="mb-2 text-sm text-gray-500">Expirées depuis plus de 60 jours. Rien n&apos;est supprimé sans votre confirmation.</p>
+          <ul className="space-y-3">
+            {toDelete.map((s) => (
+              <DeleteStoreItem key={s.id} id={s.id} slug={s.slug} name={s.name} detail={`${s.owner_name} · ${s.owner_phone} · expirée le ${dmy(s.expires_at)}`} />
+            ))}
+          </ul>
+        </>
+      )}
 
-              <div className="grid grid-cols-2 gap-2">
-                <form method="post" action="/impersonate" target="_blank" className="col-span-2">
-                  <input type="hidden" name="store_id" value={s.id} />
-                  <button className="dash-btn dash-btn-primary w-full !min-h-11 text-sm">🛠️ Ouvrir le tableau de bord (support)</button>
-                </form>
-                <div className="col-span-2">
-                  <ResendWelcome storeId={s.id} storeName={s.name} />
-                </div>
-                <form action={renewStore}>
-                  <input type="hidden" name="id" value={s.id} />
-                  <button className="dash-btn dash-btn-ghost w-full !min-h-11 text-sm">+1 an</button>
-                </form>
-                <form action={toggleSuspend}>
-                  <input type="hidden" name="id" value={s.id} />
-                  <button className="dash-btn dash-btn-danger w-full !min-h-11 text-sm">{s.status === "active" ? "Suspendre" : "Réactiver"}</button>
-                </form>
-                {days <= 10 && (
-                  <a
-                    className="dash-btn col-span-2 !min-h-11 bg-[#25d366] text-sm text-white"
-                    target="_blank"
-                    href={waLink(s.owner_phone, `السلام عليكم، اشتراك متجركم ${s.name} ينتهي يوم ${s.expires_at.slice(0, 10)}. للتجديد تواصلوا معنا.`)}
-                  >
-                    Rappel de renouvellement WhatsApp
-                  </a>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      <form action={adminLogout} className="mt-8">
-        <button className="dash-btn w-full text-gray-500">Se déconnecter</button>
-      </form>
+      <h2 className="mb-2 mt-6 text-lg font-extrabold">📊 Google Sheet</h2>
+      <section className="dash-card space-y-3 p-4">
+        <p className="text-sm">
+          {sheetConfigured(env) ? "✅ Connecté" : "⚪ Non connecté (SHEET_WEBHOOK_URL / SHEET_SECRET)"} ·{" "}
+          <b data-testid="sheet-pending">{queue?.n ?? 0}</b> en attente de relance
+        </p>
+        {queue?.err && <p className="text-xs text-red-700">Dernière erreur : {queue.err}</p>}
+        <SheetActions />
+      </section>
+
+      <h2 className="mb-2 mt-6 text-lg font-extrabold">⚙️ Tâche quotidienne</h2>
+      <section className="dash-card space-y-2 p-4">
+        <p className="text-sm text-gray-600">
+          Chaque jour à 08:00 (heure d&apos;Algérie). Dernière exécution : {lastJob ? `${lastJob.created_at} UTC` : "jamais"}.
+        </p>
+        <DailyJobButton />
+      </section>
+      <p className="mt-6 text-center text-sm">
+        <Link href="/stores" className="underline">Toutes les boutiques →</Link>
+      </p>
     </>
   );
 }

@@ -134,7 +134,7 @@ export function NewStoreForm({ rootDomain }: { rootDomain: string }) {
         <WelcomePanel welcome={welcome} title="✅ Boutique en ligne !" />
         <div className="grid gap-2">
           <a href="/stores/new" className="dash-btn dash-btn-primary">➕ Créer une autre boutique</a>
-          <Link href="/" className="dash-btn dash-btn-ghost">← Liste des boutiques</Link>
+          <Link href="/stores" className="dash-btn dash-btn-ghost">← Liste des boutiques</Link>
         </div>
       </div>
     );

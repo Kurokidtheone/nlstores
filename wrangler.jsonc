@@ -1,7 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "nl-stores",
-  "main": ".open-next/worker.js",
+  // worker.ts = the OpenNext app + the daily cron (scheduled handler)
+  "main": "worker.ts",
   "compatibility_date": "2025-08-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
@@ -18,6 +19,8 @@
       "migrations_dir": "db/migrations"
     }
   ],
+  // Daily renewals job: 07:00 UTC = 08:00 Algeria (see worker.ts, lib/daily-job.ts)
+  "triggers": { "crons": ["0 7 * * *"] },
   "r2_buckets": [
     {
       "binding": "MEDIA",

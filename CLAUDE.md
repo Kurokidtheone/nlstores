@@ -23,4 +23,5 @@ Next Level Stores: one Next.js app on Cloudflare (Workers + D1 + R2) serves many
 
 ## Not decided yet
 
+- **Payment details:** `lib/billing.ts` still holds placeholder CCP / BaridiMob numbers until the owner gives the real ones.
 - **Domain not bought yet.** `wrangler.jsonc` (`ROOT_DOMAIN`, `ADMIN_HOST`) and the build variables still use the placeholder `yourbrand.com`. When the owner gives the domain, replace it everywhere (`grep -rn yourbrand.com`).

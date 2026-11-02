@@ -29,6 +29,8 @@ export type Store = {
   owner_wilaya: number | null;
   facebook_url: string | null;
   request_ref: string | null;
+  // 0004_renewals: written by the daily job
+  lifecycle: "active" | "grace" | "expired" | "to_delete";
 };
 
 export type VariantGroup = { name: string; options: string[] };

@@ -7,7 +7,7 @@ export default async function NewStorePage() {
   const { env } = await requireAdmin();
   return (
     <>
-      <Link href="/" className="mb-3 inline-block text-sm text-gray-600">← Boutiques</Link>
+      <Link href="/stores" className="mb-3 inline-block text-sm text-gray-600">← Boutiques</Link>
       <PageTitle fr="Nouvelle boutique" ar="متجر جديد" />
       <NewStoreForm rootDomain={env.ROOT_DOMAIN} />
     </>

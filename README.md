@@ -23,6 +23,7 @@ yourbrand.com            redirect -> Next Level /stores page (sales + WhatsApp)
 nl-stores/
 ├── CLAUDE.md                     # rules every Claude Code session follows
 ├── middleware.ts                 # Host -> store / admin / redirect
+├── worker.ts                     # Worker entry: OpenNext app + daily cron (07:00 UTC -> /api/cron/daily)
 ├── app/
 │   ├── s/[host]/
 │   │   ├── (shop)/               # PUBLIC STOREFRONT
@@ -35,6 +36,7 @@ nl-stores/
 │   │       ├── actions.ts        #   ALL seller server actions (requireSeller + store_id on every query)
 │   │       ├── login/
 │   │       ├── password/         #   change password (forced while must_change_password = 1)
+│   │       ├── renew/            #   renewal screen (replaces the dashboard once expired)
 │   │       └── (app)/            #   logged-in pages + bottom nav
 │   │           ├── page.tsx      #     home stats + "store setup" checklist
 │   │           ├── orders/       #     call, "no answer" counter, status, block number
@@ -44,13 +46,16 @@ nl-stores/
 │   │           ├── settings/     #     logo, design + preview, palettes, announcement bar, policy, language, WhatsApp, pixels
 │   │           └── help/         #     tutorial videos (lib/help.ts) + WhatsApp support
 │   ├── admin/                    # OWNER PANEL (admin.yourbrand.com)
+│   │   ├── page.tsx              #   TODAY: reminders to send, to-delete stores, counters, Google Sheet, daily job
+│   │   ├── stores/               #   all stores (renew with receipt, support, domains) + new/
+│   │   ├── export/               #   CSV backup of the Google Sheet columns
 │   │   ├── actions.ts            #   create-and-go-live (one D1 batch), resend welcome, domain check, renew, suspend
-│   │   ├── page.tsx              #   stores, payments, domain status, support buttons, renewal reminder
 │   │   ├── impersonate/          #   "open dashboard as this store" (logged, single-use 60 s link)
 │   │   ├── WelcomePanel.tsx      #   welcome message: Copy + Send on WhatsApp
 │   │   └── stores/new/           #   ONE screen: client, store, payment, quick products
 │   └── api/
 │       ├── orders/               # POST order (prices recomputed server-side)
+│       ├── cron/daily/           # daily job, refuses calls without the CRON_SECRET header
 │       ├── upload/               # seller image upload -> R2 (stores/<storeId>/<uuid>.webp)
 │       ├── admin/upload|media/   # admin uploads: receipts/ (private), staging/ (quick product photos)
 │       └── media/[...key]/       # serves R2 images with 1-year cache
@@ -73,6 +78,11 @@ nl-stores/
 │   ├── policy.ts                 # default delivery & returns text (AR + FR)
 │   ├── help.ts                   # tutorial video links + support WhatsApp number
 │   ├── onboarding.ts             # validation of the admin "new store" screen
+│   ├── billing.ts                # ⚠️ renewal prices (8,000 / 13,000 DA) + YOUR CCP / BaridiMob details
+│   ├── daily-job.ts              # lifecycle (grace/expired/to_delete), reminders, sheet retries
+│   ├── renewal.ts                # reminder / thank-you / seller messages (AR + FR)
+│   ├── sheet-sync.ts             # Google Sheet rows, sync after actions, retry queue
+│   ├── store-state.ts            # dates: grace 7 days, delete list 60 days, days left (Algeria time)
 │   ├── welcome.ts                # welcome message (AR / FR, CNAME steps for custom domains)
 │   ├── plans.ts, password.ts     # 20,000 / 25,000 DA plans, 8-char temporary passwords
 │   ├── auth.ts                   # PBKDF2 passwords + signed session cookie (Web Crypto)
@@ -81,11 +91,12 @@ nl-stores/
 │   ├── algeria/phone.ts          # 05/06/07 validation, wa.me links
 │   └── i18n.ts                   # storefront text AR / FR
 ├── db/
-│   ├── migrations/               # 0001_init, 0002_store_self_service, 0003_onboarding; every change = a NEW file
+│   ├── migrations/               # 0001_init … 0004_renewals; every change = a NEW file
 │   ├── seed-demo.sql             # demo store for local dev (demo.localhost)
 │   └── seeds/demo.sql            # demo store for the live D1 (paste in the D1 console)
 ├── docs/screenshots/             # 390px screenshots from the automated browser tests
 ├── scripts/hash-password.mjs     # node scripts/hash-password.mjs <password>
+├── scripts/google-sheet/Code.gs  # Apps Script to paste in your Google Sheet (setup steps inside)
 └── wrangler.jsonc                # D1 + R2 bindings, vars, migrations_dir
 ```
 
@@ -126,6 +137,28 @@ Before going live on a domain:
 3. When you create a store in admin with a custom domain, the hostname is created through the API (needs `CF_ZONE_ID` and the `CF_API_TOKEN` secret).
 4. At the registrar of the client domain: `CNAME www → stores.yourbrand.com` (and redirect the apex to `www`, or use a registrar that supports CNAME flattening). SSL turns active on its own.
 
+## Renewals (daily job)
+
+Every day at 08:00 Algeria time (cron `0 7 * * *` in `wrangler.jsonc`, handler in `worker.ts`) the
+platform calls `POST /api/cron/daily` with the `CRON_SECRET` secret. The job:
+
+- moves stores to **grace** (expired, still online 7 days), **expired** (store offline, the seller
+  sees the renewal screen) and **to_delete** (60 days after the end: listed in admin, deleted only
+  after you type the store address);
+- creates the WhatsApp reminders of the day (30 days, 7 days, day 0, 3 days after) shown on the
+  admin **Aujourd'hui** page;
+- retries Google Sheet syncs that failed and syncs every store whose status changed.
+
+Admin → Aujourd'hui → **Lancer la tâche quotidienne maintenant** runs it by hand.
+Your payment details for the messages: `lib/billing.ts`.
+
+## Google Sheet
+
+`scripts/google-sheet/Code.gs` holds the setup steps (paste it in Extensions → Apps Script, run
+`setup`, deploy as Web app). Then set the Cloudflare secrets `SHEET_WEBHOOK_URL` and `SHEET_SECRET`
+and click **Tout synchroniser** in admin. A sync never blocks an action: failures wait in
+`sheet_sync_queue` and are retried by the daily job or the **Relancer la file** button.
+
 ## Before the first paying client
 
 - [ ] Commune dropdown: import the 1,541 communes mapped to the 69 wilayas (currently a free-text field)
@@ -134,6 +167,7 @@ Before going live on a domain:
 - [ ] Orders export (CSV / Excel)
 - [x] Seller: change password, logo upload, settings, setup checklist
 - [ ] Paste the 4 tutorial video links in `lib/help.ts`
+- [ ] Put your real CCP / BaridiMob details in `lib/billing.ts`
 - [ ] Daily D1 backup (`wrangler d1 export` on a schedule)
 - [ ] Courier wilaya codes: Yalidine / ZR may still use the 58 old codes; map them in the courier add-on
 - [ ] Verify wilayas 59–69 numbering against the Journal officiel list

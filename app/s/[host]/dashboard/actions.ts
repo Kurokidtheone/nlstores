@@ -12,8 +12,9 @@ import { getOffers, getProductById, uniqueSlug } from "@/lib/catalog";
 import { getEnv } from "@/lib/db";
 import { copyStoreMedia, deleteStoreMedia } from "@/lib/media";
 import { LIMITS, slugify, storeKeyRe, toInt, validateProductInput, type FieldErrors, type ProductInput } from "@/lib/products";
-import { currentStore, isOpen, requireSeller, storeState } from "@/lib/tenant";
+import { currentStore, requireSeller, storeState } from "@/lib/tenant";
 import { publicUrl } from "@/lib/urls";
+import { scheduleSheetSync } from "@/lib/sheet-sync";
 import type { Msg, OrderStatus, Product } from "@/lib/types";
 
 /** Public paths of a store live under /s/<host>/ after the middleware rewrite */
@@ -57,7 +58,8 @@ export type LoginState = { error?: Msg };
 export async function login(_prev: LoginState, form: FormData): Promise<LoginState> {
   const store = await currentStore();
   if (!store) return { error: { fr: "Boutique introuvable", ar: "المتجر غير موجود" } };
-  if (!isOpen(storeState(store))) return { error: { fr: "Abonnement expiré. Contactez-nous.", ar: "انتهى الاشتراك. تواصل معنا." } };
+  // Expired stores can log in: they land on the renewal screen. Suspended ones can't.
+  if (storeState(store) === "suspended") return { error: { fr: "Boutique suspendue. Contactez-nous.", ar: "المتجر موقوف. تواصل معنا." } };
   const phone = normalizePhone(String(form.get("phone") ?? ""));
   const password = String(form.get("password") ?? "");
   const bad = { error: { fr: "Téléphone ou mot de passe incorrect", ar: "الهاتف أو كلمة السر غير صحيحة" } };
@@ -374,6 +376,7 @@ export async function saveSettings(_prev: SimpleState, form: FormData): Promise<
       store.id,
     )
     .run();
+  if (name !== store.name) await scheduleSheetSync(store.id); // the sheet shows the store name
   // Old logo replaced or removed -> delete its R2 file
   if (store.logo_key && store.logo_key !== logoKey) await deleteUnusedMedia(db, store.id, [store.logo_key]);
   revalidatePath(`/s/${encodeURIComponent(host)}`, "layout");

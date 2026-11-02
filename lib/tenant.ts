@@ -10,9 +10,11 @@ import type { Store } from "./types";
 const STORE_COLUMNS =
   "s.id, s.slug, s.name, s.lang, s.design, s.primary_color, s.whatsapp, s.meta_pixel_id, s.tiktok_pixel_id, s.owner_name, s.owner_phone, s.status, s.expires_at, s.created_at, " +
   "s.logo_key, s.accent_color, s.announcement, s.announcement_on, s.policy, s.must_change_password, s.password_changed_at, s.session_version, s.delivery_checked, " +
-  "s.owner_wilaya, s.facebook_url, s.request_ref";
+  "s.owner_wilaya, s.facebook_url, s.request_ref, s.lifecycle";
 
-export const GRACE_DAYS = 7;
+// Dates and states live in lib/store-state.ts (pure, also used by the daily job)
+export { GRACE_DAYS, isOpen, storeState, type StoreState } from "./store-state";
+import { isOpen, storeState } from "./store-state";
 
 export const currentHost = cache(async (): Promise<string> => {
   return ((await headers()).get("host") ?? "").split(":")[0].toLowerCase();
@@ -31,17 +33,8 @@ export async function currentStore(): Promise<Store | null> {
   return getStoreByHost(await currentHost());
 }
 
-export type StoreState = "active" | "grace" | "expired" | "suspended";
 
-/** Expired stores keep working for GRACE_DAYS so a late renewal does not cut live ads */
-export function storeState(store: Pick<Store, "status" | "expires_at">, now = Date.now()): StoreState {
-  if (store.status === "suspended") return "suspended";
-  const exp = Date.parse(store.expires_at);
-  if (Number.isNaN(exp) || now <= exp) return "active";
-  return now <= exp + GRACE_DAYS * 86_400_000 ? "grace" : "expired";
-}
 
-export const isOpen = (s: StoreState) => s === "active" || s === "grace";
 
 /**
  * True when the visitor is logged in as the seller of this store (no redirect).
@@ -66,9 +59,11 @@ export async function sellerSession(store: Store): Promise<SellerSession | null>
  * (only that screen and its action pass { passwordScreen: true }).
  * impersonating = the owner opened this dashboard from admin (support): banner, no forced
  * password screen, and the password can't be changed.
+ * Expired after the grace period: everything goes to the renewal screen (/dashboard/renew,
+ * which passes { renewScreen: true }). Suspended: back to login with a message.
  */
 export async function requireSeller(
-  opts: { passwordScreen?: boolean } = {},
+  opts: { passwordScreen?: boolean; renewScreen?: boolean } = {},
 ): Promise<{ store: Store; db: D1Database; host: string; impersonating: boolean }> {
   const host = await currentHost();
   const store = await getStoreByHost(host);
@@ -76,8 +71,10 @@ export async function requireSeller(
   const session = await sellerSession(store);
   if (!session) redirect("/dashboard/login");
   const impersonating = session.imp === true;
-  if (!isOpen(storeState(store)) && !impersonating) redirect("/dashboard/login?expired=1");
-  if (store.must_change_password === 1 && !opts.passwordScreen && !impersonating) redirect("/dashboard/password");
+  const state = storeState(store);
+  if (state === "suspended" && !impersonating) redirect("/dashboard/login?suspended=1");
+  if (state === "expired" && !impersonating && !opts.renewScreen) redirect("/dashboard/renew");
+  if (store.must_change_password === 1 && !opts.passwordScreen && !opts.renewScreen && !impersonating) redirect("/dashboard/password");
   return { store, db: await getDb(), host, impersonating };
 }
 

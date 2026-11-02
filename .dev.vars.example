@@ -7,3 +7,10 @@ CF_API_TOKEN=
 # Local overrides of wrangler.jsonc vars
 ROOT_DOMAIN=localhost
 ADMIN_HOST=admin.localhost
+
+# Daily job: the cron sends it in the x-cron-secret header (long random string)
+CRON_SECRET=local-cron-secret-change-me-1234
+
+# Google Sheet sync (scripts/google-sheet/Code.gs): Web app URL + the secret written in Code.gs
+SHEET_WEBHOOK_URL=
+SHEET_SECRET=

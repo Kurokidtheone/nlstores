@@ -16,6 +16,13 @@ import { currentHost, requireAdmin } from "@/lib/tenant";
 import type { Lang, Msg } from "@/lib/types";
 import { publicUrl } from "@/lib/urls";
 import { welcomeMessage } from "@/lib/welcome";
+import { runDailyJob, type DailyReport } from "@/lib/daily-job";
+import { PAYMENT_METHODS } from "@/lib/plans";
+import { RECEIPT_KEY_RE } from "@/lib/onboarding";
+import { thankYouMessage } from "@/lib/renewal";
+import { buildSheetRows, postRows, retrySheetQueue, scheduleSheetSync, syncAllStores, type PostResult } from "@/lib/sheet-sync";
+import { lifecycleOf } from "@/lib/store-state";
+import { toInt } from "@/lib/products";
 
 export type AdminState = { error?: Msg; ok?: string };
 
@@ -225,6 +232,7 @@ export async function createStoreFull(input: unknown): Promise<CreateResult> {
   const staging = products.flatMap((p) => p.photos);
   if (staging.length) await bucket.delete(staging).catch(() => {});
   if (store.custom_domain) await registerCustomDomain(db, env, store.custom_domain);
+  await scheduleSheetSync(storeId);
 
   revalidatePath("/admin");
   return { ok: true, welcome: await buildWelcome(db, env, storeId, password) };
@@ -281,18 +289,58 @@ export async function checkDomain(form: FormData) {
       .run();
   }
   await db.prepare("INSERT INTO admin_log (action, store_id, detail) VALUES ('check_domain', ?, ?)").bind(d.store_id, d.hostname).run();
+  await scheduleSheetSync(d.store_id);
   revalidatePath("/admin");
 }
 
-export async function renewStore(form: FormData) {
+// ---------------------------------------------------------------- renewal (+1 year with payment)
+
+export type RenewResult =
+  | { ok: true; expiresAt: string; message: string; phone: string; lang: Lang }
+  | { ok: false; error: string };
+
+/** +1 year from max(today, end date), payment + receipt recorded, sheet synced, thank-you message */
+export async function renewWithPayment(input: { storeId: number; amount: unknown; method: unknown; receipt_key: unknown }): Promise<RenewResult> {
   const { db } = await requireAdmin();
-  const id = Number(form.get("id"));
-  const store = await db.prepare("SELECT expires_at FROM stores WHERE id = ?").bind(id).first<{ expires_at: string }>();
-  if (!store) return;
-  const base = new Date(Math.max(Date.now(), Date.parse(store.expires_at) || 0));
-  base.setUTCFullYear(base.getUTCFullYear() + 1);
-  await db.prepare("UPDATE stores SET expires_at = ?, status = 'active' WHERE id = ?").bind(base.toISOString(), id).run();
+  const storeId = Number(input.storeId);
+  const amount = toInt(input.amount);
+  const method = String(input.method ?? "");
+  const receipt = typeof input.receipt_key === "string" && input.receipt_key ? input.receipt_key : null;
+  if (!Number.isInteger(storeId)) return { ok: false, error: "Boutique introuvable" };
+  if (amount === null || Number.isNaN(amount) || amount < 1000 || amount > 1_000_000) return { ok: false, error: "Montant invalide" };
+  if (!PAYMENT_METHODS.some((m) => m.id === method)) return { ok: false, error: "Choisissez le moyen de paiement" };
+  if (receipt && !RECEIPT_KEY_RE.test(receipt)) return { ok: false, error: "Reçu invalide" };
+
+  const store = await db
+    .prepare("SELECT id, name, owner_name, owner_phone, lang, expires_at FROM stores WHERE id = ?")
+    .bind(storeId)
+    .first<{ id: number; name: string; owner_name: string; owner_phone: string; lang: Lang; expires_at: string }>();
+  if (!store) return { ok: false, error: "Boutique introuvable" };
+
+  // Paid early: the new year starts at the old end date. Paid late: it starts today.
+  const start = new Date(Math.max(Date.now(), Date.parse(store.expires_at) || 0));
+  const end = new Date(start);
+  end.setUTCFullYear(end.getUTCFullYear() + 1);
+  await db.batch([
+    db.prepare("UPDATE stores SET expires_at = ?, lifecycle = 'active', status = 'active' WHERE id = ?").bind(end.toISOString(), storeId),
+    db
+      .prepare(
+        `INSERT INTO payments (store_id, amount, method, receipt_key, reference, period_start, period_end, kind)
+         SELECT id, ?, ?, ?, request_ref, ?, ?, 'renewal' FROM stores WHERE id = ?`,
+      )
+      .bind(amount, method, receipt, start.toISOString(), end.toISOString(), storeId),
+    db.prepare("UPDATE renewal_reminders SET status = 'skipped' WHERE store_id = ? AND status = 'pending'").bind(storeId),
+    db.prepare("INSERT INTO admin_log (action, store_id, detail) VALUES ('renew', ?, ?)").bind(storeId, JSON.stringify({ amount, method, until: end.toISOString() })),
+  ]);
+  await scheduleSheetSync(storeId);
   revalidatePath("/admin");
+  return {
+    ok: true,
+    expiresAt: end.toISOString(),
+    phone: store.owner_phone,
+    lang: store.lang,
+    message: thankYouMessage({ lang: store.lang, ownerName: store.owner_name || store.name, storeName: store.name, expiresAt: end.toISOString(), amount }),
+  };
 }
 
 export async function toggleSuspend(form: FormData) {
@@ -302,5 +350,96 @@ export async function toggleSuspend(form: FormData) {
     .prepare("UPDATE stores SET status = CASE status WHEN 'active' THEN 'suspended' ELSE 'active' END WHERE id = ?")
     .bind(id)
     .run();
+  await db.prepare("INSERT INTO admin_log (action, store_id) VALUES ('toggle_suspend', ?)").bind(id).run();
+  await scheduleSheetSync(id);
   revalidatePath("/admin");
+}
+
+// ---------------------------------------------------------------- daily job, reminders, sheet
+
+export async function runDailyJobNow(): Promise<DailyReport> {
+  const { db, env } = await requireAdmin();
+  const report = await runDailyJob(db, env);
+  revalidatePath("/admin");
+  return report;
+}
+
+/** "Send on WhatsApp" was clicked: the reminder is done */
+export async function markReminderSent(id: number) {
+  const { db } = await requireAdmin();
+  if (!Number.isInteger(id)) return;
+  await db.batch([
+    db.prepare("UPDATE renewal_reminders SET status = 'sent', sent_at = datetime('now') WHERE id = ? AND status = 'pending'").bind(id),
+    db.prepare("INSERT INTO admin_log (action, store_id, detail) SELECT 'reminder_sent', store_id, kind FROM renewal_reminders WHERE id = ?").bind(id),
+  ]);
+  revalidatePath("/admin");
+}
+
+export async function syncAllToSheet(): Promise<PostResult & { count: number }> {
+  const { db, env } = await requireAdmin();
+  const res = await syncAllStores(db, env);
+  revalidatePath("/admin");
+  return res;
+}
+
+export async function retrySheetNow(): Promise<{ retried: number; result: PostResult }> {
+  const { db, env } = await requireAdmin();
+  const res = await retrySheetQueue(db, env, true);
+  revalidatePath("/admin");
+  return res;
+}
+
+// ---------------------------------------------------------------- delete (only "to delete" stores, confirmed)
+
+async function deleteCustomHostname(env: CloudflareEnv, id: string) {
+  if (!env.CF_API_TOKEN || !env.CF_ZONE_ID || env.CF_ZONE_ID.startsWith("REPLACE")) return;
+  await fetch(`https://api.cloudflare.com/client/v4/zones/${env.CF_ZONE_ID}/custom_hostnames/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${env.CF_API_TOKEN}` },
+  }).catch(() => {});
+}
+
+/**
+ * Deletes a store expired for more than 60 days, after the admin typed its address to confirm:
+ * photos (R2), custom hostname (Cloudflare), every row (D1 cascade). The sheet row is marked
+ * "Supprimée" and the deletion stays in admin_log.
+ */
+export async function deleteStore(storeId: number, confirmSlug: string): Promise<{ ok: boolean; error?: string }> {
+  const { db, env } = await requireAdmin();
+  const store = await db
+    .prepare("SELECT id, slug, name, owner_name, owner_phone, expires_at FROM stores WHERE id = ?")
+    .bind(storeId)
+    .first<{ id: number; slug: string; name: string; owner_name: string; owner_phone: string; expires_at: string }>();
+  if (!store) return { ok: false, error: "Boutique introuvable" };
+  if (lifecycleOf(store.expires_at) !== "to_delete") return { ok: false, error: "Seules les boutiques expirées depuis plus de 60 jours peuvent être supprimées" };
+  if (String(confirmSlug ?? "").trim().toLowerCase() !== store.slug) return { ok: false, error: `Tapez exactement « ${store.slug} » pour confirmer` };
+
+  // Last row for the sheet, before the data disappears
+  const [row] = await buildSheetRows(db, env, [store.id]);
+  if (row) {
+    row[12] = "Supprimée";
+    await postRows(env, [row]);
+  }
+  const { results: custom } = await db
+    .prepare("SELECT cf_hostname_id FROM domains WHERE store_id = ? AND kind = 'custom' AND cf_hostname_id IS NOT NULL")
+    .bind(store.id)
+    .all<{ cf_hostname_id: string }>();
+  for (const d of custom) await deleteCustomHostname(env, d.cf_hostname_id);
+  // R2: every file of the store
+  let cursor: string | undefined;
+  do {
+    const list = await env.MEDIA.list({ prefix: `stores/${store.id}/`, cursor });
+    if (list.objects.length) await env.MEDIA.delete(list.objects.map((o) => o.key));
+    cursor = list.truncated ? list.cursor : undefined;
+  } while (cursor);
+  const paid = await db.prepare("SELECT COALESCE(SUM(amount), 0) AS n FROM payments WHERE store_id = ?").bind(store.id).first<{ n: number }>();
+  await db.batch([
+    db.prepare("DELETE FROM stores WHERE id = ?").bind(store.id), // cascades to every store table
+    db.prepare("DELETE FROM sheet_sync_queue WHERE store_id = ?").bind(store.id),
+    db
+      .prepare("INSERT INTO admin_log (action, store_id, detail) VALUES ('delete_store', ?, ?)")
+      .bind(store.id, JSON.stringify({ slug: store.slug, name: store.name, owner: store.owner_name, phone: store.owner_phone, expired: store.expires_at, total_paid: paid?.n ?? 0 })),
+  ]);
+  revalidatePath("/admin");
+  return { ok: true };
 }
