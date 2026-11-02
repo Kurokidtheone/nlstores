@@ -7,7 +7,8 @@ import { Bi, FieldError } from "@/components/dash/ui";
 import { UploadField } from "@/components/UploadField";
 import { DESIGNS, getDesign } from "@/designs/registry";
 import { mediaUrl } from "@/lib/media";
-import { DEFAULT_POLICY, policyText } from "@/lib/policy";
+import { getTemplate } from "@/designs/templates";
+import { policyText } from "@/lib/policy";
 import type { Lang, Store } from "@/lib/types";
 import { saveSettings, type SimpleState } from "../../actions";
 
@@ -50,9 +51,12 @@ export function SettingsForm({ store }: { store: Store }) {
     }
   }
 
+  // Default delivery & returns text = the design template's (designs/<id>/template.ts)
+  const defaultPolicy = (l: Lang) => getTemplate(design).policy[l];
+
   function pickLang(l: Lang) {
     // The default policy text follows the language until the seller edits it
-    if (policy.trim() === DEFAULT_POLICY[lang].trim()) setPolicy(DEFAULT_POLICY[l]);
+    if (policy.trim() === defaultPolicy(lang).trim()) setPolicy(defaultPolicy(l));
     setLang(l);
   }
 
@@ -211,7 +215,7 @@ export function SettingsForm({ store }: { store: Store }) {
           Lien en bas de chaque page de la boutique. <span className="ar block">رابط في أسفل كل صفحة من المتجر.</span>
         </p>
         <textarea name="policy" value={policy} onChange={(e) => setPolicy(e.target.value)} dir="auto" maxLength={5000} rows={12} className="dash-input text-sm leading-relaxed" />
-        <button type="button" onClick={() => setPolicy(DEFAULT_POLICY[lang])} className="dash-btn dash-btn-ghost w-full text-sm">
+        <button type="button" onClick={() => setPolicy(defaultPolicy(lang))} className="dash-btn dash-btn-ghost w-full text-sm">
           ↺ Remettre le texte par défaut · <span className="ar">النص الافتراضي</span>
         </button>
         <a href="/policy" target="_blank" rel="noopener" className="block text-center text-sm text-[var(--brand)] underline">

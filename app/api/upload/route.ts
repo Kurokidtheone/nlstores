@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/db";
-import { currentStore, isOpen, isSellerOf, storeState } from "@/lib/tenant";
+import { currentStore, isOpen, sellerSession, storeState } from "@/lib/tenant";
 
 const TYPES: Record<string, string> = { "image/webp": "webp", "image/jpeg": "jpg", "image/png": "png" };
 const MAX_BYTES = 3 * 1024 * 1024; // photos are already compressed in the browser
@@ -8,7 +8,9 @@ const MAX_BYTES = 3 * 1024 * 1024; // photos are already compressed in the brows
 // Seller image upload -> R2 at stores/<storeId>/<uuid>.<ext>. Only the logged-in seller of this host.
 export async function POST(req: Request) {
   const store = await currentStore();
-  if (!store || !(await isSellerOf(store)) || !isOpen(storeState(store)) || store.must_change_password === 1) {
+  const session = store ? await sellerSession(store) : null;
+  // Blocked until a forced password change is done, except for the admin in support mode
+  if (!store || !session || !isOpen(storeState(store)) || (store.must_change_password === 1 && !session.imp)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const form = await req.formData().catch(() => null);

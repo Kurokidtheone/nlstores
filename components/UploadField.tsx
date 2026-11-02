@@ -35,11 +35,11 @@ async function compress(file: File, square: boolean): Promise<Blob> {
   return (await toBlob("image/jpeg")) ?? file;
 }
 
-async function upload(file: File, square: boolean): Promise<string> {
+async function upload(file: File, square: boolean, endpoint: string): Promise<string> {
   const blob = await compress(file, square);
   const form = new FormData();
   form.append("file", blob, file.name);
-  const res = await fetch("/api/upload", { method: "POST", body: form });
+  const res = await fetch(endpoint, { method: "POST", body: form });
   const data = (await res.json().catch(() => ({}))) as { key?: string; error?: string };
   if (!res.ok || !data.key) throw new Error(data.error ?? "Échec de l'envoi");
   return data.key;
@@ -54,10 +54,12 @@ type Props = {
   label?: { fr: string; ar: string };
   /** crop to a square (logo) */
   square?: boolean;
+  /** /api/upload (seller) or /api/admin/upload?kind=… (admin) */
+  endpoint?: string;
 };
 
 /** Photo picker -> browser compression -> /api/upload (R2). Returns R2 keys. */
-export function UploadField({ onUploaded, multiple = false, remaining = 10, label = { fr: "Ajouter des photos", ar: "إضافة صور" }, square = false }: Props) {
+export function UploadField({ onUploaded, multiple = false, remaining = 10, label = { fr: "Ajouter des photos", ar: "إضافة صور" }, square = false, endpoint = "/api/upload" }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export function UploadField({ onUploaded, multiple = false, remaining = 10, labe
     for (let i = 0; i < files.length; i++) {
       setProgress(`${i + 1}/${files.length}`);
       try {
-        onUploaded(await upload(files[i], square));
+        onUploaded(await upload(files[i], square, endpoint));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erreur");
       }

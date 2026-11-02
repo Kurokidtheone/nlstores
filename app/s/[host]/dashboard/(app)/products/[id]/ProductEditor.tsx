@@ -70,6 +70,7 @@ export function ProductEditor({ product, offers }: { product: Product; offers: O
   const [status, setStatus] = useState<"idle" | "saved" | "error">("idle");
   const [discarded, setDiscarded] = useState<string[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isSample, setIsSample] = useState(product.is_sample); // saving makes it the seller's own
   const [saving, startSaving] = useTransition();
   const [busy, startBusy] = useTransition();
   const dirty = JSON.stringify(form) !== JSON.stringify(saved);
@@ -126,6 +127,7 @@ export function ProductEditor({ product, offers }: { product: Product; offers: O
           setDiscarded([]);
           setErrors({});
           setStatus("saved");
+          setIsSample(false);
         } else {
           scrollToError.current = true;
           setErrors(res.errors);
@@ -159,6 +161,12 @@ export function ProductEditor({ product, offers }: { product: Product; offers: O
         </a>
       </div>
       <h1 className="truncate text-2xl font-extrabold">{form.name || "Produit"}</h1>
+      {isSample && (
+        <p className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900" data-testid="sample-banner">
+          ✏️ Remplacez ce produit exemple par le vôtre : nom, photos, prix… puis Enregistrer.
+          <span className="ar mt-1 block">استبدل هذا المنتج التجريبي بمنتجك: الاسم، الصور، السعر… ثم احفظ.</span>
+        </p>
+      )}
 
       <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" aria-label="Sections">
         {JUMPS.map((j) => (

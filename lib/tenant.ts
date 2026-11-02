@@ -3,13 +3,14 @@
 import { cache } from "react";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { ADMIN_COOKIE, SELLER_COOKIE, readSession } from "./auth";
+import { ADMIN_COOKIE, SELLER_COOKIE, readSession, type Session } from "./auth";
 import { getDb, getEnv } from "./db";
 import type { Store } from "./types";
 
 const STORE_COLUMNS =
   "s.id, s.slug, s.name, s.lang, s.design, s.primary_color, s.whatsapp, s.meta_pixel_id, s.tiktok_pixel_id, s.owner_name, s.owner_phone, s.status, s.expires_at, s.created_at, " +
-  "s.logo_key, s.accent_color, s.announcement, s.announcement_on, s.policy, s.must_change_password, s.password_changed_at, s.session_version, s.delivery_checked";
+  "s.logo_key, s.accent_color, s.announcement, s.announcement_on, s.policy, s.must_change_password, s.password_changed_at, s.session_version, s.delivery_checked, " +
+  "s.owner_wilaya, s.facebook_url, s.request_ref";
 
 export const GRACE_DAYS = 7;
 
@@ -47,8 +48,15 @@ export const isOpen = (s: StoreState) => s === "active" || s === "grace";
  * A password change bumps session_version, which logs out every other device.
  */
 export async function isSellerOf(store: Store): Promise<boolean> {
+  return (await sellerSession(store)) !== null;
+}
+
+type SellerSession = Extract<Session, { role: "seller" }>;
+
+/** The seller session for this store, or null (wrong store, logged out, or older password) */
+export async function sellerSession(store: Store): Promise<SellerSession | null> {
   const s = await readSession(SELLER_COOKIE);
-  return !!s && s.role === "seller" && s.storeId === store.id && (s.v ?? 0) === store.session_version;
+  return s && s.role === "seller" && s.storeId === store.id && (s.v ?? 0) === store.session_version ? s : null;
 }
 
 /**
@@ -56,15 +64,21 @@ export async function isSellerOf(store: Store): Promise<boolean> {
  * Returns the store of the current host only if the seller session belongs to it.
  * While must_change_password = 1, everything redirects to the change-password screen
  * (only that screen and its action pass { passwordScreen: true }).
+ * impersonating = the owner opened this dashboard from admin (support): banner, no forced
+ * password screen, and the password can't be changed.
  */
-export async function requireSeller(opts: { passwordScreen?: boolean } = {}): Promise<{ store: Store; db: D1Database; host: string }> {
+export async function requireSeller(
+  opts: { passwordScreen?: boolean } = {},
+): Promise<{ store: Store; db: D1Database; host: string; impersonating: boolean }> {
   const host = await currentHost();
   const store = await getStoreByHost(host);
   if (!store) notFound();
-  if (!(await isSellerOf(store))) redirect("/dashboard/login");
-  if (!isOpen(storeState(store))) redirect("/dashboard/login?expired=1");
-  if (store.must_change_password === 1 && !opts.passwordScreen) redirect("/dashboard/password");
-  return { store, db: await getDb(), host };
+  const session = await sellerSession(store);
+  if (!session) redirect("/dashboard/login");
+  const impersonating = session.imp === true;
+  if (!isOpen(storeState(store)) && !impersonating) redirect("/dashboard/login?expired=1");
+  if (store.must_change_password === 1 && !opts.passwordScreen && !impersonating) redirect("/dashboard/password");
+  return { store, db: await getDb(), host, impersonating };
 }
 
 /** First line of every admin page and server action. Only works on ADMIN_HOST. */

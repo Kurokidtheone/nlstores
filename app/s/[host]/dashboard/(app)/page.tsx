@@ -9,7 +9,7 @@ import { logout } from "../actions";
 type Step = { done: boolean; fr: string; ar: string; href: string };
 
 async function setupSteps(db: D1Database, store: Store): Promise<Step[]> {
-  const products = await db.prepare("SELECT COUNT(*) AS n FROM products WHERE store_id = ?").bind(store.id).first<{ n: number }>();
+  const products = await db.prepare("SELECT COUNT(*) AS n FROM products WHERE store_id = ? AND is_sample = 0").bind(store.id).first<{ n: number }>();
   return [
     { done: !!store.logo_key, fr: "Ajouter votre logo", ar: "أضف شعارك", href: "/dashboard/settings" },
     { done: (products?.n ?? 0) > 0, fr: "Ajouter au moins un produit", ar: "أضف منتجا واحدا على الأقل", href: "/dashboard/products" },

@@ -52,6 +52,7 @@ export default async function ProductsPage() {
                 <p className="truncate font-bold">{p.name}</p>
                 <p className="text-sm"><bdi>{formatDA(p.price)}</bdi></p>
                 <p className="flex flex-wrap gap-1 text-xs">
+                  {p.is_sample && <span className="rounded-full bg-amber-200 px-2 py-0.5 font-semibold text-amber-900">Exemple · تجريبي</span>}
                   {!p.visible && <span className="rounded-full bg-gray-200 px-2 py-0.5 font-semibold text-gray-700">Masqué · مخفي</span>}
                   {p.stock !== null && p.stock <= 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-700">Rupture · نفد</span>}
                   <span className="text-[var(--brand)] underline">Modifier · تعديل</span>

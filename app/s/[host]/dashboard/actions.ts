@@ -13,6 +13,7 @@ import { getEnv } from "@/lib/db";
 import { copyStoreMedia, deleteStoreMedia } from "@/lib/media";
 import { LIMITS, slugify, storeKeyRe, toInt, validateProductInput, type FieldErrors, type ProductInput } from "@/lib/products";
 import { currentStore, isOpen, requireSeller, storeState } from "@/lib/tenant";
+import { publicUrl } from "@/lib/urls";
 import type { Msg, OrderStatus, Product } from "@/lib/types";
 
 /** Public paths of a store live under /s/<host>/ after the middleware rewrite */
@@ -76,7 +77,9 @@ export type PasswordState = { error?: Msg; field?: string };
 
 /** Current password + new one twice. Logs out every other device (session_version + 1). */
 export async function changePassword(_prev: PasswordState, form: FormData): Promise<PasswordState> {
-  const { store, db } = await requireSeller({ passwordScreen: true });
+  const { store, db, impersonating } = await requireSeller({ passwordScreen: true });
+  if (impersonating)
+    return { error: { fr: "Mode support admin : le mot de passe du vendeur ne peut pas être changé ici", ar: "وضع الدعم: لا يمكن تغيير كلمة سر البائع" } };
   const current = String(form.get("current") ?? "");
   const next = String(form.get("new") ?? "");
   const confirm = String(form.get("confirm") ?? "");
@@ -105,6 +108,13 @@ export async function changePassword(_prev: PasswordState, form: FormData): Prom
 export async function logout() {
   await endSession(SELLER_COOKIE);
   redirect("/dashboard/login");
+}
+
+/** "Quitter" on the admin support banner: drop the impersonated session, back to the admin panel */
+export async function endImpersonation() {
+  await endSession(SELLER_COOKIE);
+  const env = await getEnv();
+  redirect(await publicUrl(env.ADMIN_HOST, "/"));
 }
 
 // ---------------------------------------------------------------- orders
@@ -197,7 +207,7 @@ export async function saveProduct(id: number, input: unknown, discarded: unknown
       db
         .prepare(
           `UPDATE products SET name = ?, slug = ?, description = ?, price = ?, old_price = ?, stock = ?, visible = ?,
-                  images = ?, video_url = ?, variants = ?, sections = ?, updated_at = datetime('now')
+                  images = ?, video_url = ?, variants = ?, sections = ?, is_sample = 0, updated_at = datetime('now')
            WHERE id = ? AND store_id = ?`,
         )
         .bind(

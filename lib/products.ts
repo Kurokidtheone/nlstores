@@ -91,6 +91,7 @@ export function rowToProduct(r: ProductRow): Product {
     sections: readSections(json(r.sections)),
     visible: Number(r.visible) === 1,
     sort: Number(r.sort ?? 0),
+    is_sample: Number(r.is_sample ?? 0) === 1,
   };
 }
 

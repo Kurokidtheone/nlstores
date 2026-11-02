@@ -25,6 +25,10 @@ export type Store = {
   password_changed_at: string | null;
   session_version: number;
   delivery_checked: number;
+  // 0003_onboarding
+  owner_wilaya: number | null;
+  facebook_url: string | null;
+  request_ref: string | null;
 };
 
 export type VariantGroup = { name: string; options: string[] };
@@ -56,6 +60,8 @@ export type Product = {
   sections: Sections;
   visible: boolean;
   sort: number;
+  /** from the design template: "Replace this sample product" until edited */
+  is_sample: boolean;
 };
 
 export type Offer = { qty: number; total_price: number };

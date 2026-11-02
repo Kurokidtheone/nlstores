@@ -45,9 +45,12 @@ export const SELLER_COOKIE = "nls_seller";
 export const ADMIN_COOKIE = "nls_admin";
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
-/** v = stores.session_version at login time (a password change invalidates older sessions) */
-export type Session = { role: "seller"; storeId: number; v?: number; exp: number } | { role: "admin"; exp: number };
-type NewSession = { role: "seller"; storeId: number; v: number } | { role: "admin" };
+/**
+ * v = stores.session_version at login time (a password change invalidates older sessions).
+ * imp = admin "open dashboard as this store" (support): short session, banner, no password change.
+ */
+export type Session = { role: "seller"; storeId: number; v?: number; imp?: boolean; exp: number } | { role: "admin"; exp: number };
+type NewSession = { role: "seller"; storeId: number; v: number; imp?: boolean } | { role: "admin" };
 
 async function hmac(data: string): Promise<string> {
   const secret = (await getEnv()).SESSION_SECRET;
@@ -75,15 +78,37 @@ async function verify(token: string | undefined): Promise<Session | null> {
   }
 }
 
-export async function startSession(cookie: string, session: NewSession): Promise<void> {
-  const token = await sign({ ...session, exp: Math.floor(Date.now() / 1000) + MAX_AGE } as Session);
+export async function startSession(cookie: string, session: NewSession, maxAge = MAX_AGE): Promise<void> {
+  const token = await sign({ ...session, exp: Math.floor(Date.now() / 1000) + maxAge } as Session);
   (await cookies()).set(cookie, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: MAX_AGE,
+    maxAge,
   });
+}
+
+// ---------- short signed tokens (impersonation links) ----------
+// Signed over "tok:" + body, so a token can never be used as a session cookie, nor the reverse.
+
+export type ImpersonationToken = { purpose: "impersonate"; storeId: number; nonce: string; exp: number };
+
+export async function signToken(payload: Omit<ImpersonationToken, "exp">, ttlSeconds: number): Promise<string> {
+  const body = b64url(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + ttlSeconds }));
+  return `${body}.${await hmac(`tok:${body}`)}`;
+}
+
+export async function verifyToken(token: string | null): Promise<ImpersonationToken | null> {
+  if (!token) return null;
+  const [body, sig] = token.split(".");
+  if (!body || !sig || !safeEqual(sig, await hmac(`tok:${body}`))) return null;
+  try {
+    const t = JSON.parse(unb64url(body)) as ImpersonationToken;
+    return t.purpose === "impersonate" && t.exp > Date.now() / 1000 ? t : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function readSession(cookie: string): Promise<Session | null> {

@@ -6,7 +6,7 @@ Next Level Stores: one Next.js app on Cloudflare (Workers + D1 + R2) serves many
 2. **Never trust the browser with money.** Prices, totals and delivery fees sent by the browser are ignored; recompute them from the database (see `lib/orders.ts`).
 3. **Storefront text** lives in `lib/i18n.ts` in Arabic and French. Arabic pages are RTL; wrap prices in `<bdi>`.
 4. **Algeria has 69 wilayas.** Always use `lib/algeria/wilayas.ts`; never hardcode 58.
-5. **Designs = options + CSS** (`designs/<id>/index.ts` and `app/globals.css` `[data-design]`). Shared sections live in `designs/shared`. New features go in shared sections so every design gets them.
+5. **Designs = options + CSS** (`designs/<id>/index.ts` and `app/globals.css` `[data-design]`), plus the starting content of a new store in `designs/<id>/template.ts` (AR + FR, base in `designs/shared/template-base.ts`). Shared sections live in `designs/shared`. New features go in shared sections so every design gets them.
 6. **Database changes:** never edit an applied migration. Every change is a new numbered file in `db/migrations/` (`0002_….sql`, `0003_….sql`, …).
 7. **Mobile first:** test every screen at 390px wide.
 8. **Keep the seller dashboard simple:** French + Arabic labels, big buttons, no feature without a clear daily use.

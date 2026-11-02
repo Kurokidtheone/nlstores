@@ -44,16 +44,20 @@ nl-stores/
 │   │           ├── settings/     #     logo, design + preview, palettes, announcement bar, policy, language, WhatsApp, pixels
 │   │           └── help/         #     tutorial videos (lib/help.ts) + WhatsApp support
 │   ├── admin/                    # OWNER PANEL (admin.yourbrand.com)
-│   │   ├── actions.ts            #   create store, renew (+1 year), suspend
-│   │   ├── page.tsx              #   all stores, expiry, WhatsApp renewal reminder
-│   │   └── stores/new/           #   form you fill after the WhatsApp payment
+│   │   ├── actions.ts            #   create-and-go-live (one D1 batch), resend welcome, domain check, renew, suspend
+│   │   ├── page.tsx              #   stores, payments, domain status, support buttons, renewal reminder
+│   │   ├── impersonate/          #   "open dashboard as this store" (logged, single-use 60 s link)
+│   │   ├── WelcomePanel.tsx      #   welcome message: Copy + Send on WhatsApp
+│   │   └── stores/new/           #   ONE screen: client, store, payment, quick products
 │   └── api/
 │       ├── orders/               # POST order (prices recomputed server-side)
 │       ├── upload/               # seller image upload -> R2 (stores/<storeId>/<uuid>.webp)
+│       ├── admin/upload|media/   # admin uploads: receipts/ (private), staging/ (quick product photos)
 │       └── media/[...key]/       # serves R2 images with 1-year cache
 ├── designs/
 │   ├── registry.ts               # design list; a design = options + CSS, not new code
-│   ├── glow/ maison/ style/ bebe/ tech/
+│   ├── templates.ts              # getTemplate(design): what a new store starts with
+│   ├── glow/ maison/ style/ bebe/ tech/   # index.ts (options, palettes) + template.ts (texts, sample product)
 │   └── shared/                   # ProductLanding, OrderForm, ProductGrid, StoreHeader, StoreFooter, AnnouncementBar, Gallery, VideoEmbed
 ├── components/
 │   ├── Pixels.tsx                # Meta + TikTok base code, Purchase event
@@ -68,13 +72,16 @@ nl-stores/
 │   ├── video.ts                  # YouTube / Facebook link -> embed
 │   ├── policy.ts                 # default delivery & returns text (AR + FR)
 │   ├── help.ts                   # tutorial video links + support WhatsApp number
+│   ├── onboarding.ts             # validation of the admin "new store" screen
+│   ├── welcome.ts                # welcome message (AR / FR, CNAME steps for custom domains)
+│   ├── plans.ts, password.ts     # 20,000 / 25,000 DA plans, 8-char temporary passwords
 │   ├── auth.ts                   # PBKDF2 passwords + signed session cookie (Web Crypto)
 │   ├── cloudflare-domains.ts     # Cloudflare for SaaS custom hostnames
 │   ├── algeria/wilayas.ts        # 69 wilayas, FR + AR
 │   ├── algeria/phone.ts          # 05/06/07 validation, wa.me links
 │   └── i18n.ts                   # storefront text AR / FR
 ├── db/
-│   ├── migrations/               # 0001_init, 0002_store_self_service; every change = a NEW numbered file
+│   ├── migrations/               # 0001_init, 0002_store_self_service, 0003_onboarding; every change = a NEW file
 │   ├── seed-demo.sql             # demo store for local dev (demo.localhost)
 │   └── seeds/demo.sql            # demo store for the live D1 (paste in the D1 console)
 ├── docs/screenshots/             # 390px screenshots from the automated browser tests
@@ -96,7 +103,7 @@ npm run dev
 - Seller dashboard: http://demo.localhost:3000/dashboard — `0555000000` / `demo1234`
 - Admin: http://admin.localhost:3000 — password from `ADMIN_PASSWORD` in `.dev.vars`
 - A store you create in admin with sub-domain `abc` opens at http://abc.localhost:3000
-  (the password you give is temporary: the seller must choose their own at first login)
+  (the welcome message holds an 8-character temporary password; the seller chooses their own at first login)
 
 Database changes: add `db/migrations/0002_what_changed.sql`, run `npm run db:migrate:local`.
 Never edit a migration that is already applied.
