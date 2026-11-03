@@ -1,17 +1,19 @@
 import type { Design } from "../registry";
 
+// Premium beauty / skincare: blush ivory background, serif titles (Playfair for Latin, IBM Plex
+// Sans Arabic bold for Arabic), soft framed product photos, gradient pill buttons.
 export const glow: Design = {
   id: "glow",
   name: "Glow",
-  tagline: { fr: "Beauté, cosmétiques, parfums", ar: "تجميل، عناية، عطور" },
-  defaultColor: "#db2777",
+  tagline: { fr: "Beauté, soins, cosmétiques, parfums", ar: "تجميل، عناية بالبشرة، عطور" },
+  defaultColor: "#b83268",
   palettes: [
-    { fr: "Rose", ar: "وردي", primary: "#db2777", accent: "#831843" },
-    { fr: "Corail", ar: "مرجاني", primary: "#f43f5e", accent: "#881337" },
-    { fr: "Prune", ar: "برقوقي", primary: "#a21caf", accent: "#3b0764" },
-    { fr: "Pêche", ar: "خوخي", primary: "#ea580c", accent: "#7c2d12" },
-    { fr: "Lavande", ar: "لافندر", primary: "#7c3aed", accent: "#2e1065" },
-    { fr: "Nude", ar: "بيج", primary: "#b45309", accent: "#451a03" },
+    { fr: "Rose poudré", ar: "وردي بودرة", primary: "#b83268", accent: "#3d1426" },
+    { fr: "Nude", ar: "بيج", primary: "#a8714f", accent: "#3b261b" },
+    { fr: "Prune", ar: "برقوقي", primary: "#7d2e68", accent: "#2a1023" },
+    { fr: "Corail", ar: "مرجاني", primary: "#c94a45", accent: "#4a1714" },
+    { fr: "Or rose", ar: "ذهبي وردي", primary: "#a85d69", accent: "#3a1f25" },
+    { fr: "Lavande", ar: "لافندر", primary: "#6f52aa", accent: "#271b40" },
   ],
-  options: { gallery: "square", gridCols: 2 },
+  options: { gallery: "square", gridCols: 2, layout: "formFirst", hero: "framed", homeHero: true },
 };

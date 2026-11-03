@@ -94,7 +94,10 @@ nl-stores/
 ├── db/
 │   ├── migrations/               # 0001_init … 0004_renewals; every change = a NEW file
 │   ├── seed-demo.sql             # demo store for local dev (demo.localhost)
+│   ├── seeds/demo-glow.sql       # GLOW design demo store (beauty, AR) for the live D1 console
 │   └── seeds/demo.sql            # demo store for the live D1 (paste in the D1 console)
+├── app/fonts/                    # self-hosted storefront fonts (IBM Plex Sans Arabic, Playfair Display; OFL)
+├── public/demo/<design>/         # placeholder images of demo stores (keys "demo/…", replace in the editor)
 ├── docs/screenshots/             # 390px screenshots from the automated browser tests
 ├── scripts/hash-password.mjs     # node scripts/hash-password.mjs <password>
 ├── scripts/google-sheet/Code.gs  # Apps Script to paste in your Google Sheet (setup steps inside)

@@ -52,6 +52,11 @@ const dict = {
   commune_other: { ar: "أخرى (اكتب اسم البلدية)", fr: "Autre (écrire le nom)" },
   commune_choose_wilaya: { ar: "اختر الولاية أولا", fr: "Choisissez d'abord la wilaya" },
   commune_none: { ar: "لا توجد نتيجة", fr: "Aucun résultat" },
+  trust_cod: { ar: "الدفع عند الاستلام", fr: "Paiement à la livraison" },
+  trust_69: { ar: "التوصيل إلى 69 ولاية", fr: "Livraison 69 wilayas" },
+  trust_check: { ar: "افحص قبل الدفع", fr: "Vérifiez avant de payer" },
+  home_promise: { ar: "منتجات أصلية · الدفع عند الاستلام · توصيل إلى 69 ولاية", fr: "Produits authentiques · paiement à la livraison · 69 wilayas" },
+  shop_now: { ar: "تسوقي الآن", fr: "Découvrir" },
   preview_hidden: { ar: "معاينة: هذا المنتج مخفي عن الزبائن", fr: "Aperçu : ce produit est masqué aux clients" },
 } as const;
 

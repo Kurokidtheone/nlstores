@@ -22,6 +22,12 @@ export type Design = {
     gallery: "square" | "portrait";
     /** show the product grid in 1 or 2 columns on phones */
     gridCols: 1 | 2;
+    /** formFirst: the order form comes right after the price (description and benefits below) */
+    layout?: "classic" | "formFirst";
+    /** framed: product photos in a soft frame with the discount badge on the photo */
+    hero?: "plain" | "framed";
+    /** a welcome banner (store name + promise) above the product grid on the home page */
+    homeHero?: boolean;
   };
 };
 

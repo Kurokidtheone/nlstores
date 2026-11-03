@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { storeFontVars } from "@/app/fonts/fonts";
 import { Pixels } from "@/components/Pixels";
 import { DESIGNS } from "@/designs/registry";
 import { AnnouncementBar } from "@/designs/shared/AnnouncementBar";
@@ -51,7 +52,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       dir={dirOf(lang)}
       lang={lang}
       data-design={look.design}
-      className="store flex flex-col"
+      className={`store flex flex-col ${storeFontVars}`}
       style={{ "--brand": look.primary_color, "--accent": look.accent_color } as React.CSSProperties}
     >
       {preview && <p className="bg-amber-300 px-4 py-2 text-center text-sm font-bold text-amber-950">👁️ {t(lang, "preview_design")}</p>}

@@ -31,11 +31,7 @@ body {
 }
 
 /* ---------- designs ---------- */
-[data-design="glow"] {
-  --bg: #fff7fb;
-  --radius: 20px;
-  --btn-radius: 999px;
-}
+/* glow: see the full block "GLOW — premium beauty" below the shared classes */
 [data-design="maison"] {
   --bg: #faf7f2;
   --card: #fffdf9;
@@ -96,6 +92,15 @@ body {
   background: var(--accent);
   color: #fff;
 }
+/* Trust strip under the price (every design) */
+.store-trust-item {
+  background: var(--soft);
+  color: var(--text);
+}
+.store-trust-icon {
+  color: var(--brand);
+}
+
 /* Product pages have a fixed "Order" bar: keep the footer readable above it */
 .store:has(.store-fixed-cta) .store-footer {
   padding-bottom: 7rem;
@@ -222,4 +227,141 @@ body {
 /* Dashboard: the Arabic line sits right under its French label */
 .dash .ar {
   text-align: left;
+}
+
+/* ============================================================================================
+   GLOW — premium beauty. Blush ivory, deep plum text, serif titles, soft framed photos,
+   gradient pill buttons. Fonts: app/fonts/fonts.ts (variables set on the store root).
+   No letter-spacing on Arabic: it breaks the joined letters.
+   ============================================================================================ */
+[data-design="glow"] {
+  --bg: #fff8f5;
+  --card: #ffffff;
+  --text: #2b1621;
+  --muted: #76606b;
+  --line: #f2e0e5;
+  --radius: 22px;
+  --btn-radius: 999px;
+  --font: var(--font-plex-latin), var(--font-plex-arabic), system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+  --heading-font: var(--font-playfair), var(--font-plex-arabic), Georgia, "Times New Roman", serif;
+  --soft: color-mix(in srgb, var(--brand) 7%, #fff8f5);
+  --shadow: 0 1px 2px rgb(43 22 33 / 0.04), 0 10px 28px rgb(43 22 33 / 0.07);
+  font-family: var(--font);
+}
+[data-design="glow"][dir="rtl"] {
+  line-height: 1.7;
+  /* Arabic titles: one family for Arabic and Latin (a serif "C" or "30" inside an Arabic title looks broken) */
+  --heading-font: var(--font-plex-arabic), var(--font-plex-latin), system-ui, sans-serif;
+}
+[data-design="glow"][dir="ltr"] .store-heading {
+  letter-spacing: -0.015em;
+}
+[data-design="glow"] .store-header {
+  background: rgb(255 248 245 / 0.9);
+  border-bottom-color: var(--line);
+}
+[data-design="glow"] .store-card {
+  border-color: var(--line);
+  box-shadow: var(--shadow);
+}
+[data-design="glow"] .store-btn {
+  background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 72%, var(--accent)));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--brand) 30%, transparent);
+}
+
+/* Product photos in a soft blush frame, discount badge on the photo */
+[data-design="glow"] .store-hero-framed > div {
+  padding: 10px;
+  border-radius: 30px;
+  background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--brand) 14%, #ffffff) 0%, #ffffff 72%);
+  box-shadow: var(--shadow);
+}
+[data-design="glow"] .store-hero-framed .store-img {
+  border-radius: 22px;
+}
+[data-design="glow"] .store-hero-badge {
+  box-shadow: 0 4px 12px rgb(43 22 33 / 0.18);
+}
+
+/* Title, price, trust strip */
+[data-design="glow"] .store-product-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+[data-design="glow"] .store-price {
+  font-size: 2.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+[data-design="glow"] .store-trust-item {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  font-weight: 600;
+}
+[data-design="glow"] .store-trust-icon {
+  width: 26px;
+  height: 26px;
+  padding: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand) 10%, #ffffff);
+}
+
+/* Section titles with a thin fading rule */
+[data-design="glow"] .store-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 700;
+}
+[data-design="glow"] .store-section-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line), transparent);
+}
+[data-design="glow"][dir="rtl"] .store-section-title::after {
+  background: linear-gradient(270deg, var(--line), transparent);
+}
+
+/* Order form: the most important card of the page */
+[data-design="glow"] #order {
+  border: 1.5px solid color-mix(in srgb, var(--brand) 22%, #ffffff);
+  border-radius: 26px;
+  box-shadow: 0 14px 40px color-mix(in srgb, var(--brand) 12%, transparent);
+}
+[data-design="glow"] .store-input {
+  min-height: 52px;
+  border-color: var(--line);
+  border-radius: 14px;
+  background: #fffdfc;
+}
+[data-design="glow"] .store-option {
+  border-radius: 14px;
+}
+
+/* Sticky "Order now" */
+[data-design="glow"] .store-fixed-cta {
+  background: rgb(255 248 245 / 0.92);
+  border-top-color: var(--line);
+}
+
+/* Home: welcome banner and product cards */
+[data-design="glow"] .store-home-hero-inner {
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(80% 120% at 90% 0%, color-mix(in srgb, var(--brand) 20%, transparent), transparent 60%),
+    radial-gradient(70% 100% at 0% 100%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+    #ffffff;
+  box-shadow: var(--shadow);
+}
+[data-design="glow"] .store-home-hero h1 {
+  font-size: 2.25rem;
+  color: var(--accent);
+}
+[data-design="glow"] .store-product-card {
+  border-radius: 20px;
+}
+[data-design="glow"] details.store-card[open] {
+  border-color: color-mix(in srgb, var(--brand) 25%, #ffffff);
 }

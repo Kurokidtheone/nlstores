@@ -17,5 +17,5 @@ export default async function StoreHome({ searchParams }: Props) {
     for (const [k, v] of Object.entries(await searchParams)) if (k.startsWith("preview_") && typeof v === "string") q.set(k, v);
     redirect(`/p/${products[0].slug}${q.size ? `?${q}` : ""}`);
   }
-  return <ProductGrid products={products} lang={store.lang} design={getDesign(store.design)} />;
+  return <ProductGrid products={products} lang={store.lang} design={getDesign(store.design)} storeName={store.name} />;
 }

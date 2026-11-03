@@ -5,7 +5,7 @@ import type { Store } from "@/lib/types";
 
 export function StoreHeader({ store }: { store: Store }) {
   return (
-    <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--card)]/95 backdrop-blur">
+    <header className="store-header sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--card)]/95 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4">
         <Link href="/" className="flex min-w-0 items-center gap-2">
           {store.logo_key && (

@@ -1,7 +1,9 @@
 // R2 media helpers. Keys look like stores/<storeId>/<uuid>.webp
 import { storeKeyRe } from "./products";
 
-export const mediaUrl = (key: string) => `/api/media/${key}`;
+/** Placeholder images of demo stores live in /public/demo (key "demo/…"); everything else in R2 */
+export const DEMO_KEY_RE = /^demo\/[a-z0-9-]+\/[a-z0-9-]+\.(svg|webp|jpg|png)$/;
+export const mediaUrl = (key: string) => (DEMO_KEY_RE.test(key) ? `/${key}` : `/api/media/${key}`);
 
 /** Deletes R2 files, but only ones that belong to this store */
 export async function deleteStoreMedia(bucket: R2Bucket, storeId: number, keys: Iterable<string>): Promise<void> {

@@ -169,7 +169,9 @@ export function validateProductInput(
   const visible = o.visible === true;
 
   // Photos: only this store's uploads
-  const keyRe = storeKeyRe(storeId);
+  // This store's uploads, or the read-only placeholder images of a demo store (never deleted)
+  const storeRe = storeKeyRe(storeId);
+  const keyRe = { test: (k: string) => storeRe.test(k) || /^demo\/[a-z0-9-]+\/[a-z0-9-]+\.(svg|webp|jpg|png)$/.test(k) };
   const images = Array.isArray(o.images) ? o.images : [];
   if (images.length > LIMITS.images || images.some((k) => typeof k !== "string" || !keyRe.test(k)) || new Set(images).size !== images.length)
     e.images = { fr: `Photos invalides (${LIMITS.images} max.)`, ar: `صور غير صالحة (${LIMITS.images} كحد أقصى)` };

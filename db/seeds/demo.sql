@@ -10,12 +10,12 @@
 -- Safe to run twice: existing rows are kept.
 
 INSERT OR IGNORE INTO stores (slug, name, lang, design, primary_color, whatsapp, owner_name, owner_phone, password_hash, expires_at)
-VALUES ('demo', 'Glow Demo', 'ar', 'glow', '#db2777', '0555000000', 'Demo', '0555000000',
+VALUES ('demo', 'Glow Demo', 'ar', 'glow', '#b83268', '0555000000', 'Demo', '0555000000',
         'pbkdf2$100000$LmSWY/SuUD2sQyj45XyUXw==$EcZQsE4QKacDHbxgjOfKhYfCRoT14j71tLWjWFCobVk=',
         '2099-12-31T00:00:00Z');
 
 -- Settings added in migration 0002 (only filled once, so a seller's edits are kept)
-UPDATE stores SET accent_color = '#831843', announcement = 'التوصيل مجاني ابتداء من قطعتين 🚚', announcement_on = 1
+UPDATE stores SET accent_color = '#3d1426', announcement = 'التوصيل مجاني ابتداء من قطعتين 🚚', announcement_on = 1
 WHERE slug = 'demo' AND announcement = '';
 
 INSERT OR IGNORE INTO domains (hostname, store_id, kind)
