@@ -4,6 +4,7 @@ import { WILAYAS } from "@/lib/algeria/wilayas";
 import { normalizePhone } from "@/lib/algeria/phone";
 import { formatDA } from "@/lib/format";
 import { t, type TKey } from "@/lib/i18n";
+import { CommuneSelect } from "./CommuneSelect";
 import type { DeliveryPrice, Lang, Offer, VariantGroup } from "@/lib/types";
 
 type Props = {
@@ -22,6 +23,7 @@ export function OrderForm({ lang, product, offers, delivery }: Props) {
   const [phone, setPhone] = useState("");
   const [wilaya, setWilaya] = useState(0);
   const [commune, setCommune] = useState("");
+  const [website, setWebsite] = useState(""); // honeypot: hidden, only bots fill it
   const [address, setAddress] = useState("");
   const [deliveryType, setDeliveryType] = useState<"home" | "desk">("home");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -55,7 +57,7 @@ export function OrderForm({ lang, product, offers, delivery }: Props) {
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: product.id, qty, variant, delivery_type: deliveryType, name, phone, wilaya, commune, address }),
+        body: JSON.stringify({ product_id: product.id, qty, variant, delivery_type: deliveryType, name, phone, wilaya, commune, address, website }),
       });
       const data = (await res.json()) as { ok: boolean; orderId?: number; error?: TKey; field?: string };
       if (data.ok && data.orderId) {
@@ -146,7 +148,7 @@ export function OrderForm({ lang, product, offers, delivery }: Props) {
       </div>
       <div data-field="commune">
         <label className="mb-1 block text-sm font-semibold" htmlFor="o-commune">{tr("commune")}</label>
-        <input id="o-commune" className="store-input" value={commune} onChange={(e) => setCommune(e.target.value)} />
+        <CommuneSelect id="o-commune" lang={lang} wilaya={wilaya} value={commune} onChange={setCommune} invalid={!!errors.commune} />
         {err("commune")}
       </div>
       <div>
@@ -190,6 +192,12 @@ export function OrderForm({ lang, product, offers, delivery }: Props) {
         </div>
       </dl>
 
+      <div aria-hidden="true" style={{ position: "absolute", left: "-10000px", width: 1, height: 1, overflow: "hidden" }}>
+        <label>
+          Website
+          <input name="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+        </label>
+      </div>
       {err("form")}
       <button type="submit" disabled={sending || soldOut} className="store-btn store-pulse min-h-14 w-full text-lg">
         {soldOut ? tr("out_of_stock") : sending ? tr("sending") : tr("confirm_order")}

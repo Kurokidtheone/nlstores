@@ -44,6 +44,14 @@ const dict = {
   policy_title: { ar: "التوصيل والإرجاع", fr: "Livraison et retours" },
   footer_cod: { ar: "الدفع عند الاستلام في 69 ولاية", fr: "Paiement à la livraison dans les 69 wilayas" },
   preview_design: { ar: "معاينة التصميم — لم يتم الحفظ بعد", fr: "Aperçu du design — pas encore enregistré" },
+  too_many_orders: {
+    ar: "لقد أرسلت عدة طلبات في وقت قصير. أعد المحاولة بعد ساعة أو تواصل معنا على واتساب.",
+    fr: "Trop de commandes en peu de temps. Réessayez dans une heure ou contactez-nous sur WhatsApp.",
+  },
+  commune_search: { ar: "ابحث عن بلديتك", fr: "Rechercher votre commune" },
+  commune_other: { ar: "أخرى (اكتب اسم البلدية)", fr: "Autre (écrire le nom)" },
+  commune_choose_wilaya: { ar: "اختر الولاية أولا", fr: "Choisissez d'abord la wilaya" },
+  commune_none: { ar: "لا توجد نتيجة", fr: "Aucun résultat" },
   preview_hidden: { ar: "معاينة: هذا المنتج مخفي عن الزبائن", fr: "Aperçu : ce produit est masqué aux clients" },
 } as const;
 

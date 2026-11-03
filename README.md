@@ -87,7 +87,8 @@ nl-stores/
 │   ├── plans.ts, password.ts     # 20,000 / 25,000 DA plans, 8-char temporary passwords
 │   ├── auth.ts                   # PBKDF2 passwords + signed session cookie (Web Crypto)
 │   ├── cloudflare-domains.ts     # Cloudflare for SaaS custom hostnames
-│   ├── algeria/wilayas.ts        # 69 wilayas, FR + AR
+│   ├── algeria/wilayas.ts        # 69 wilayas, FR + AR (59-69 numbered as in décret 26-206)
+│   ├── algeria/communes.ts       # 1,541 communes under the 69-wilaya map (generated, see "Communes")
 │   ├── algeria/phone.ts          # 05/06/07 validation, wa.me links
 │   └── i18n.ts                   # storefront text AR / FR
 ├── db/
@@ -137,6 +138,42 @@ Before going live on a domain:
 3. When you create a store in admin with a custom domain, the hostname is created through the API (needs `CF_ZONE_ID` and the `CF_API_TOKEN` secret).
 4. At the registrar of the client domain: `CNAME www → stores.yourbrand.com` (and redirect the apex to `www`, or use a registrar that supports CNAME flattening). SSL turns active on its own.
 
+## Communes
+
+`lib/algeria/communes.ts` holds the 1,541 communes, each with its wilaya under the 69-wilaya map
+(loi n° 26-06, JO n° 25 of 2026; wilayas 59-69 numbered by décret présidentiel n° 26-206, JO n° 40).
+Generated from [syscli/algeria](https://github.com/syscli/algeria) (MIT, `data/communes.csv`,
+commit `7789ea9`), which is transcribed from the Journal officiel texts. Checked commune by commune
+against [test-bit-sys/algeria-geo](https://github.com/test-bit-sys/algeria-geo) and
+[riadh2002/algeria-69-wilayas-1541-communes](https://github.com/riadh2002/algeria-69-wilayas-1541-communes):
+identical for all 1,541 communes, including every commune of wilayas 59-69, except two
+(both from the 2019 law, not the 2026 reform). They are not guessed: the order form offers them
+under both wilayas.
+
+| Commune | Datasets say | Shown under |
+|---|---|---|
+| Tabelbala | 52 Béni Abbès (2 datasets) / 08 Béchar (1) | 52 and 08 |
+| El Borma | 55 Touggourt (1) / 30 Ouargla (2) | 55 and 30 |
+
+The order form shows a searchable list of the chosen wilaya's communes (served by
+`/api/communes/<wilaya>`, cached a day) with "Autre" + free text. `orders.commune` stays text.
+
+## Order abuse protection
+
+- In the app (`lib/orders.ts`): max **5 orders per phone** and **20 per IP** per hour per store,
+  counted in D1 (the IP is stored as a salted hash, never in clear), and a hidden honeypot field.
+  The buyer sees a clear Arabic / French message.
+- At Cloudflare, before the request reaches the app — **WAF rate-limiting rule** (Free plan: 1 rule):
+  1. Cloudflare dashboard → your domain → **Security → WAF → Rate limiting rules → Create rule**.
+  2. Rule name: `Orders flood`.
+  3. If incoming requests match → **Edit expression** →
+     `(http.request.uri.path eq "/api/orders" and http.request.method eq "POST")`
+  4. With the same characteristics: **IP**.
+  5. When rate exceeds: **10 requests** per **10 seconds** (Free plan period).
+  6. Then take action: **Block**, duration **10 seconds** (Free plan). On a paid plan prefer
+     20 requests per 1 minute, block 10 minutes.
+  7. **Deploy**. It also covers client custom domains (Cloudflare for SaaS traffic goes through your zone).
+
 ## Renewals (daily job)
 
 Every day at 08:00 Algeria time (cron `0 7 * * *` in `wrangler.jsonc`, handler in `worker.ts`) the
@@ -161,16 +198,17 @@ and click **Tout synchroniser** in admin. A sync never blocks an action: failure
 
 ## Before the first paying client
 
-- [ ] Commune dropdown: import the 1,541 communes mapped to the 69 wilayas (currently a free-text field)
-- [ ] Rate-limit `POST /api/orders` and the login forms (Cloudflare WAF rate-limiting rule)
+- [x] Commune dropdown: 1,541 communes mapped to the 69 wilayas
+- [x] Rate-limit `POST /api/orders` (D1 counts + honeypot + Cloudflare WAF rule)
+- [ ] Rate-limit the login forms
 - [x] Product edit page: variants, offers, landing sections, sort
-- [ ] Orders export (CSV / Excel)
+- [x] Orders export (CSV for Excel / courier upload)
 - [x] Seller: change password, logo upload, settings, setup checklist
 - [ ] Paste the 4 tutorial video links in `lib/help.ts`
 - [ ] Put your real CCP / BaridiMob details in `lib/billing.ts`
 - [ ] Daily D1 backup (`wrangler d1 export` on a schedule)
 - [ ] Courier wilaya codes: Yalidine / ZR may still use the 58 old codes; map them in the courier add-on
-- [ ] Verify wilayas 59–69 numbering against the Journal officiel list
+- [x] Wilayas 59–69 numbered as in décret présidentiel 26-206 (JO n° 40, 2026)
 - [ ] Clean up photos uploaded in the editor but never saved (orphan R2 files)
 
 ## Notes

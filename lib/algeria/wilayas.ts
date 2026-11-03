@@ -1,5 +1,4 @@
 // The 69 wilayas of Algeria (58 + 11 created in 2025). Always use this list; never hardcode 58.
-// TODO: verify 59–69 numbering against the Journal officiel list.
 
 export type Wilaya = { code: number; fr: string; ar: string };
 
@@ -62,17 +61,18 @@ export const WILAYAS: readonly Wilaya[] = [
   { code: 56, fr: "Djanet", ar: "جانت" },
   { code: 57, fr: "El M'Ghair", ar: "المغير" },
   { code: 58, fr: "El Meniaa", ar: "المنيعة" },
-  { code: 59, fr: "Aflou", ar: "آفلو" },
-  { code: 60, fr: "El Abiodh Sidi Cheikh", ar: "الأبيض سيدي الشيخ" },
-  { code: 61, fr: "El Aricha", ar: "العريشة" },
-  { code: 62, fr: "El Kantara", ar: "القنطرة" },
-  { code: 63, fr: "Barika", ar: "بريكة" },
-  { code: 64, fr: "Bou Saâda", ar: "بوسعادة" },
-  { code: 65, fr: "Bir El Ater", ar: "بئر العاتر" },
-  { code: 66, fr: "Ksar El Boukhari", ar: "قصر البخاري" },
-  { code: 67, fr: "Ksar Chellala", ar: "قصر الشلالة" },
-  { code: 68, fr: "Aïn Oussara", ar: "عين وسارة" },
-  { code: 69, fr: "Messaad", ar: "مسعد" },
+  // 59-69: numbers and names fixed by décret présidentiel n° 26-206 (JO n° 40, 2026), loi n° 26-06
+  { code: 59, fr: "Aflou", ar: "أفلو" },
+  { code: 60, fr: "Barika", ar: "بريكة" },
+  { code: 61, fr: "El Kantara", ar: "القنطرة" },
+  { code: 62, fr: "Bir El Ater", ar: "بئر العاتر" },
+  { code: 63, fr: "El Aricha", ar: "العريشة" },
+  { code: 64, fr: "Ksar Chellala", ar: "قصر الشلالة" },
+  { code: 65, fr: "Aïn Ouessara", ar: "عين وسارة" },
+  { code: 66, fr: "Messaad", ar: "مسعد" },
+  { code: 67, fr: "Ksar El Boukhari", ar: "قصر البخاري" },
+  { code: 68, fr: "Bou Saâda", ar: "بوسعادة" },
+  { code: 69, fr: "El Abiodh Sidi Cheikh", ar: "الأبيض سيدي الشيخ" },
 ];
 
 export const WILAYA_COUNT = WILAYAS.length; // 69
@@ -84,7 +84,7 @@ export const WILAYA_COUNT = WILAYAS.length; // 69
 export const SOUTH_WILAYAS: readonly number[] = [
   1, 3, 7, 8, 11, 30, 32, 33, 37, 39, 47, // Adrar … Ghardaïa
   49, 50, 51, 52, 53, 54, 55, 56, 57, 58, // created in 2019
-  59, 60, 62, // Aflou, El Abiodh Sidi Cheikh, El Kantara (2025)
+  59, 61, 69, // Aflou, El Kantara, El Abiodh Sidi Cheikh (2026)
 ];
 
 export function isWilaya(code: number): boolean {

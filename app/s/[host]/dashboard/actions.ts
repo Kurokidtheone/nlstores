@@ -15,6 +15,8 @@ import { LIMITS, slugify, storeKeyRe, toInt, validateProductInput, type FieldErr
 import { currentStore, requireSeller, storeState } from "@/lib/tenant";
 import { publicUrl } from "@/lib/urls";
 import { scheduleSheetSync } from "@/lib/sheet-sync";
+import { updateOrder, type OrderEdit } from "@/lib/orders";
+import { t, type TKey } from "@/lib/i18n";
 import type { Msg, OrderStatus, Product } from "@/lib/types";
 
 /** Public paths of a store live under /s/<host>/ after the middleware rewrite */
@@ -155,6 +157,39 @@ export async function blockOrderPhone(form: FormData) {
     db.prepare("UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ? AND store_id = ?").bind(id, store.id),
   ]);
   revalidatePath("/", "layout");
+}
+
+/** Bulk: the selected orders get one status (only orders of this store are touched) */
+export async function bulkSetStatus(ids: number[], status: OrderStatus): Promise<{ ok: boolean; count: number }> {
+  const { store, db } = await requireSeller();
+  if (!STATUSES.includes(status) || !Array.isArray(ids)) return { ok: false, count: 0 };
+  const clean = [...new Set(ids.map(Number).filter(Number.isInteger))].slice(0, 500);
+  let count = 0;
+  for (let i = 0; i < clean.length; i += 90) {
+    const chunk = clean.slice(i, i + 90);
+    const res = await db
+      .prepare(`UPDATE orders SET status = ?, updated_at = datetime('now') WHERE store_id = ? AND id IN (${chunk.map(() => "?").join(",")})`)
+      .bind(status, store.id, ...chunk)
+      .run();
+    count += res.meta.changes ?? 0;
+  }
+  revalidatePath("/", "layout");
+  return { ok: true, count };
+}
+
+export type OrderEditResult = { ok: true; total: number } | { ok: false; error: Msg; field?: string };
+
+/** Order detail sheet: buyer fields, delivery, quantity, variant. The total is recomputed from D1. */
+export async function editOrder(id: number, input: OrderEdit): Promise<OrderEditResult> {
+  const { store, db } = await requireSeller();
+  if (!Number.isInteger(id)) return { ok: false, error: { fr: "Commande introuvable", ar: "الطلب غير موجود" } };
+  const res = await updateOrder(db, store.id, id, input);
+  if (!res.ok) {
+    const k: TKey = res.error;
+    return { ok: false, field: res.field, error: { fr: t("fr", k), ar: t("ar", k) } };
+  }
+  revalidatePath("/", "layout");
+  return res;
 }
 
 // ---------------------------------------------------------------- products
