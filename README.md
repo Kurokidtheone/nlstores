@@ -3,8 +3,9 @@
 Ready-made COD stores for Algerian sellers. One Next.js app on Cloudflare serves every store:
 each client is a row in the database, picked by the domain the visitor opened.
 
-Tested locally: product page with the 69-wilaya order form, order API (bundle price, stop desk price,
-duplicate flag, validation), seller login + orders screen, admin login + "create store".
+Tested locally in a headless browser at 390px: product editor (photos, video, variants, offers, landing
+sections, duplicate, delete, sort), product page + 69-wilaya order form, order API (prices recomputed),
+seller login, admin login + "create store", isolation between stores.
 
 ## How it fits together
 
@@ -20,47 +21,87 @@ yourbrand.com            redirect -> Next Level /stores page (sales + WhatsApp)
 
 ```
 nl-stores/
+├── CLAUDE.md                     # rules every Claude Code session follows
 ├── middleware.ts                 # Host -> store / admin / redirect
+├── worker.ts                     # Worker entry: OpenNext app + daily cron (07:00 UTC -> /api/cron/daily)
 ├── app/
 │   ├── s/[host]/
 │   │   ├── (shop)/               # PUBLIC STOREFRONT
 │   │   │   ├── layout.tsx        #   store lookup, expiry check, RTL/LTR, colors, pixels
 │   │   │   ├── page.tsx          #   home: 1 product -> its landing page, else catalog
-│   │   │   ├── p/[slug]/         #   product landing page + order form
+│   │   │   ├── p/[slug]/         #   product landing page + order form (hidden = seller preview only)
+│   │   │   ├── policy/           #   delivery & returns text (linked in the footer)
 │   │   │   └── thank-you/        #   Purchase event (Meta + TikTok)
 │   │   └── dashboard/            # SELLER DASHBOARD (on the store's own domain)
-│   │       ├── actions.ts        #   all seller server actions (always scoped to store_id)
-│   │       ├── login/  page.tsx (home stats)
-│   │       ├── orders/           #   call, "no answer" counter, status, block number
-│   │       ├── products/         #   quick add + photo upload (compressed in browser -> R2)
-│   │       ├── delivery/         #   home / stop desk price per wilaya (69)
-│   │       └── settings/         #   name, language, colors, WhatsApp, pixel IDs
+│   │       ├── actions.ts        #   ALL seller server actions (requireSeller + store_id on every query)
+│   │       ├── login/
+│   │       ├── password/         #   change password (forced while must_change_password = 1)
+│   │       ├── renew/            #   renewal screen (replaces the dashboard once expired)
+│   │       └── (app)/            #   logged-in pages + bottom nav
+│   │           ├── page.tsx      #     home stats + "store setup" checklist
+│   │           ├── orders/       #     call, "no answer" counter, status, block number
+│   │           ├── products/     #     list (order up/down, empty state), new/ (quick add)
+│   │           │   └── [id]/     #     FULL PRODUCT EDITOR (ProductEditor.tsx)
+│   │           ├── delivery/     #     home / stop desk price per wilaya (69)
+│   │           ├── settings/     #     logo, design + preview, palettes, announcement bar, policy, language, WhatsApp, pixels
+│   │           └── help/         #     tutorial videos (lib/help.ts) + WhatsApp support
 │   ├── admin/                    # OWNER PANEL (admin.yourbrand.com)
-│   │   ├── actions.ts            #   create store, renew (+1 year), suspend
-│   │   ├── page.tsx              #   all stores, expiry, WhatsApp renewal reminder
-│   │   └── stores/new/           #   form you fill after the WhatsApp payment
+│   │   ├── page.tsx              #   TODAY: reminders to send, to-delete stores, counters, Google Sheet, daily job
+│   │   ├── stores/               #   all stores (renew with receipt, support, domains) + new/
+│   │   ├── export/               #   CSV backup of the Google Sheet columns
+│   │   ├── actions.ts            #   create-and-go-live (one D1 batch), resend welcome, domain check, renew, suspend
+│   │   ├── impersonate/          #   "open dashboard as this store" (logged, single-use 60 s link)
+│   │   ├── WelcomePanel.tsx      #   welcome message: Copy + Send on WhatsApp
+│   │   └── stores/new/           #   ONE screen: client, store, payment, quick products
 │   └── api/
 │       ├── orders/               # POST order (prices recomputed server-side)
-│       ├── upload/               # seller image upload -> R2
+│       ├── cron/daily/           # daily job, refuses calls without the CRON_SECRET header
+│       ├── upload/               # seller image upload -> R2 (stores/<storeId>/<uuid>.webp)
+│       ├── admin/upload|media/   # admin uploads: receipts/ (private), staging/ (quick product photos)
 │       └── media/[...key]/       # serves R2 images with 1-year cache
 ├── designs/
 │   ├── registry.ts               # design list; a design = options + CSS, not new code
-│   ├── glow/ maison/ style/ bebe/ tech/
-│   └── shared/                   # ProductLanding, OrderForm, ProductGrid, StoreHeader
+│   ├── templates.ts              # getTemplate(design): what a new store starts with
+│   ├── glow/ maison/ style/ bebe/ tech/   # index.ts (options, palettes) + template.ts (texts, sample product)
+│   └── shared/                   # ProductLanding, OrderForm, ProductGrid, StoreHeader, StoreFooter, AnnouncementBar, Gallery, VideoEmbed
+├── components/
+│   ├── Pixels.tsx                # Meta + TikTok base code, Purchase event
+│   ├── UploadField.tsx           # photo picker, browser compression -> /api/upload
+│   └── dash/                     # dashboard UI bits (French + Arabic labels, nav bar)
 ├── lib/
 │   ├── tenant.ts                 # host -> store, expiry + 7-day grace, requireSeller/requireAdmin
+│   ├── products.ts               # product JSON model + server-side validation of the editor
 │   ├── orders.ts                 # createOrder (validation, blacklist, offers, duplicates), stats
-│   ├── catalog.ts                # products, offers, delivery prices
+│   ├── catalog.ts                # products, offers, delivery prices (read helpers)
+│   ├── media.ts                  # R2 delete / copy, scoped to one store
+│   ├── video.ts                  # YouTube / Facebook link -> embed
+│   ├── policy.ts                 # default delivery & returns text (AR + FR)
+│   ├── help.ts                   # tutorial video links + support WhatsApp number
+│   ├── onboarding.ts             # validation of the admin "new store" screen
+│   ├── billing.ts                # ⚠️ renewal prices (8,000 / 13,000 DA) + YOUR CCP / BaridiMob details
+│   ├── daily-job.ts              # lifecycle (grace/expired/to_delete), reminders, sheet retries
+│   ├── renewal.ts                # reminder / thank-you / seller messages (AR + FR)
+│   ├── sheet-sync.ts             # Google Sheet rows, sync after actions, retry queue
+│   ├── store-state.ts            # dates: grace 7 days, delete list 60 days, days left (Algeria time)
+│   ├── welcome.ts                # welcome message (AR / FR, CNAME steps for custom domains)
+│   ├── plans.ts, password.ts     # 20,000 / 25,000 DA plans, 8-char temporary passwords
 │   ├── auth.ts                   # PBKDF2 passwords + signed session cookie (Web Crypto)
 │   ├── cloudflare-domains.ts     # Cloudflare for SaaS custom hostnames
-│   ├── algeria/wilayas.ts        # 69 wilayas, FR + AR
+│   ├── algeria/wilayas.ts        # 69 wilayas, FR + AR (59-69 numbered as in décret 26-206)
+│   ├── algeria/communes.ts       # 1,541 communes under the 69-wilaya map (generated, see "Communes")
 │   ├── algeria/phone.ts          # 05/06/07 validation, wa.me links
 │   └── i18n.ts                   # storefront text AR / FR
-├── components/Pixels.tsx         # Meta + TikTok base code, Purchase event
-├── db/schema.sql                 # D1 tables
-├── db/seed-demo.sql              # demo store for local dev
-├── scripts/hash-password.mjs
-└── wrangler.jsonc                # D1 + R2 bindings, vars
+├── db/
+│   ├── migrations/               # 0001_init … 0004_renewals; every change = a NEW file
+│   ├── seed-demo.sql             # demo store for local dev (demo.localhost)
+│   ├── seeds/demo-glow.sql       # GLOW design demo store (beauty, AR) for the live D1 console
+│   └── seeds/demo.sql            # demo store for the live D1 (paste in the D1 console)
+├── app/fonts/                    # self-hosted storefront fonts (IBM Plex Sans Arabic, Playfair Display; OFL)
+├── public/demo/<design>/         # placeholder images of demo stores (keys "demo/…", replace in the editor)
+├── docs/screenshots/             # 390px screenshots from the automated browser tests
+├── scripts/hash-password.mjs     # node scripts/hash-password.mjs <password>
+├── scripts/google-sheet/Code.gs  # Apps Script to paste in your Google Sheet (setup steps inside)
+└── wrangler.jsonc                # D1 + R2 bindings, vars, migrations_dir
 ```
 
 ## Run it locally
@@ -68,49 +109,120 @@ nl-stores/
 ```bash
 npm install
 cp .env.example .env.local        # NEXT_PUBLIC_ROOT_DOMAIN=localhost
-cp .dev.vars.example .dev.vars    # SESSION_SECRET, ADMIN_PASSWORD
-npm run db:local                  # creates the local D1 + demo store
+cp .dev.vars.example .dev.vars    # SESSION_SECRET, ADMIN_PASSWORD, ROOT_DOMAIN=localhost
+npm run db:local                  # applies db/migrations + the demo seed to the LOCAL D1
 npm run dev
 ```
 
 - Store: http://demo.localhost:3000 (Chrome and Firefox resolve `*.localhost` by themselves)
 - Seller dashboard: http://demo.localhost:3000/dashboard — `0555000000` / `demo1234`
 - Admin: http://admin.localhost:3000 — password from `ADMIN_PASSWORD` in `.dev.vars`
-- A store you create in admin with slug `abc` opens at http://abc.localhost:3000 locally
-  only if `ROOT_DOMAIN` in `wrangler.jsonc` vars is `localhost` while developing.
+- A store you create in admin with sub-domain `abc` opens at http://abc.localhost:3000
+  (the welcome message holds an 8-character temporary password; the seller chooses their own at first login)
 
-## Deploy to Cloudflare (first time)
+Database changes: add `db/migrations/0002_what_changed.sql`, run `npm run db:migrate:local`.
+Never edit a migration that is already applied.
 
-1. Buy `yourbrand.com`, add it to Cloudflare.
-2. `npx wrangler d1 create stores-db` → paste the id into `wrangler.jsonc`.
-3. `npx wrangler r2 bucket create stores-media`
-4. In `wrangler.jsonc` set `ROOT_DOMAIN`, `ADMIN_HOST`, `CF_ZONE_ID`; in `.env.local` set the same domains for the build.
-5. `npx wrangler secret put SESSION_SECRET` (long random), `ADMIN_PASSWORD`, `CF_API_TOKEN` (token with *SSL and Certificates: Edit* on the zone).
-6. `npm run db:remote` then `npm run deploy`.
-7. Routes: in Workers → nl-stores → Settings → Domains & Routes, add `*.yourbrand.com/*` and `admin.yourbrand.com/*`; add a wildcard DNS record `*` (proxied).
-8. Switch to **Workers Paid ($5/month)** before the first client runs ads (free plan = 100,000 requests/day for all stores together).
+## Deploy to Cloudflare
+
+Deployment is automatic: Cloudflare Workers Builds is connected to this GitHub repository, and
+the default build settings work as they are:
+
+- Worker name in the dashboard = `"name"` in `wrangler.jsonc` (**`nextlevelstores`**).
+- Build command `npm run build` = `opennextjs-cloudflare build` (it runs `next build` itself), then
+  `scripts/ci-migrate.mjs` applies new D1 migrations — only in a Cloudflare build of `main`.
+- Deploy command `npx wrangler deploy` (default) or `npm run deploy:ci` (same, migrations again: harmless).
+- Public build values come from `.env.production`; Cloudflare "Build variables" override them. The click-by-click setup is in the pull request
+that added it. Domain not bought yet: `yourbrand.com` is a placeholder everywhere.
+
+Before going live on a domain:
+- Routes: `*.yourbrand.com/*` and `admin.yourbrand.com/*` on the Worker + a proxied wildcard DNS record `*`.
+- Switch to **Workers Paid ($5/month)** before the first client runs ads (free plan = 100,000 requests/day for all stores together).
 
 ### Custom domains (the +5,000 DA upsell)
 
 1. Cloudflare → SSL/TLS → Custom Hostnames: enable Cloudflare for SaaS, set the fallback origin (e.g. `stores.yourbrand.com`, a proxied record).
 2. Add a Worker route `*/*` so traffic for client domains reaches the Worker.
-3. When you create a store in admin with a custom domain, the hostname is created through the API.
+3. When you create a store in admin with a custom domain, the hostname is created through the API (needs `CF_ZONE_ID` and the `CF_API_TOKEN` secret).
 4. At the registrar of the client domain: `CNAME www → stores.yourbrand.com` (and redirect the apex to `www`, or use a registrar that supports CNAME flattening). SSL turns active on its own.
+
+## Communes
+
+`lib/algeria/communes.ts` holds the 1,541 communes, each with its wilaya under the 69-wilaya map
+(loi n° 26-06, JO n° 25 of 2026; wilayas 59-69 numbered by décret présidentiel n° 26-206, JO n° 40).
+Generated from [syscli/algeria](https://github.com/syscli/algeria) (MIT, `data/communes.csv`,
+commit `7789ea9`), which is transcribed from the Journal officiel texts. Checked commune by commune
+against [test-bit-sys/algeria-geo](https://github.com/test-bit-sys/algeria-geo) and
+[riadh2002/algeria-69-wilayas-1541-communes](https://github.com/riadh2002/algeria-69-wilayas-1541-communes):
+identical for all 1,541 communes, including every commune of wilayas 59-69, except two
+(both from the 2019 law, not the 2026 reform). They are not guessed: the order form offers them
+under both wilayas.
+
+| Commune | Datasets say | Shown under |
+|---|---|---|
+| Tabelbala | 52 Béni Abbès (2 datasets) / 08 Béchar (1) | 52 and 08 |
+| El Borma | 55 Touggourt (1) / 30 Ouargla (2) | 55 and 30 |
+
+The order form shows a searchable list of the chosen wilaya's communes (served by
+`/api/communes/<wilaya>`, cached a day) with "Autre" + free text. `orders.commune` stays text.
+
+## Order abuse protection
+
+- In the app (`lib/orders.ts`): max **5 orders per phone** and **20 per IP** per hour per store,
+  counted in D1 (the IP is stored as a salted hash, never in clear), and a hidden honeypot field.
+  The buyer sees a clear Arabic / French message.
+- At Cloudflare, before the request reaches the app — **WAF rate-limiting rule** (Free plan: 1 rule):
+  1. Cloudflare dashboard → your domain → **Security → WAF → Rate limiting rules → Create rule**.
+  2. Rule name: `Orders flood`.
+  3. If incoming requests match → **Edit expression** →
+     `(http.request.uri.path eq "/api/orders" and http.request.method eq "POST")`
+  4. With the same characteristics: **IP**.
+  5. When rate exceeds: **10 requests** per **10 seconds** (Free plan period).
+  6. Then take action: **Block**, duration **10 seconds** (Free plan). On a paid plan prefer
+     20 requests per 1 minute, block 10 minutes.
+  7. **Deploy**. It also covers client custom domains (Cloudflare for SaaS traffic goes through your zone).
+
+## Renewals (daily job)
+
+Every day at 08:00 Algeria time (cron `0 7 * * *` in `wrangler.jsonc`, handler in `worker.ts`) the
+platform calls `POST /api/cron/daily` with the `CRON_SECRET` secret. The job:
+
+- moves stores to **grace** (expired, still online 7 days), **expired** (store offline, the seller
+  sees the renewal screen) and **to_delete** (60 days after the end: listed in admin, deleted only
+  after you type the store address);
+- creates the WhatsApp reminders of the day (30 days, 7 days, day 0, 3 days after) shown on the
+  admin **Aujourd'hui** page;
+- retries Google Sheet syncs that failed and syncs every store whose status changed.
+
+Admin → Aujourd'hui → **Lancer la tâche quotidienne maintenant** runs it by hand.
+Your payment details for the messages: `lib/billing.ts`.
+
+## Google Sheet
+
+`scripts/google-sheet/Code.gs` holds the setup steps (paste it in Extensions → Apps Script, run
+`setup`, deploy as Web app). Then set the Cloudflare secrets `SHEET_WEBHOOK_URL` and `SHEET_SECRET`
+and click **Tout synchroniser** in admin. A sync never blocks an action: failures wait in
+`sheet_sync_queue` and are retried by the daily job or the **Relancer la file** button.
 
 ## Before the first paying client
 
-- [ ] Commune dropdown: import the 1,541 communes mapped to the 69 wilayas (currently a free-text field)
-- [ ] Rate-limit `POST /api/orders` (Cloudflare WAF rate-limiting rule)
-- [ ] Product edit page: variants, offers, landing sections, sort
-- [ ] Orders export (CSV / Excel)
-- [ ] Seller: change password, logo upload
+- [x] Commune dropdown: 1,541 communes mapped to the 69 wilayas
+- [x] Rate-limit `POST /api/orders` (D1 counts + honeypot + Cloudflare WAF rule)
+- [ ] Rate-limit the login forms
+- [x] Product edit page: variants, offers, landing sections, sort
+- [x] Orders export (CSV for Excel / courier upload)
+- [x] Seller: change password, logo upload, settings, setup checklist
+- [ ] Paste the 4 tutorial video links in `lib/help.ts`
+- [ ] Put your real CCP / BaridiMob details in `lib/billing.ts`
 - [ ] Daily D1 backup (`wrangler d1 export` on a schedule)
 - [ ] Courier wilaya codes: Yalidine / ZR may still use the 58 old codes; map them in the courier add-on
-- [ ] Verify wilayas 59–69 numbering against the Journal officiel list
+- [x] Wilayas 59–69 numbered as in décret présidentiel 26-206 (JO n° 40, 2026)
+- [ ] Clean up photos uploaded in the editor but never saved (orphan R2 files)
 
 ## Notes
 
 - Next.js 15.5 because `@opennextjs/cloudflare` supports it fully; upgrade to 16 later (middleware becomes `proxy.ts`).
 - Prices sent by the browser are never trusted: `createOrder` reads price, offers and delivery from D1.
+- Stock is checked when ordering but not decremented (fake COD orders would eat it); the seller updates it.
 - A seller session cookie is set on the store's own host, and every query filters by `store_id`.
 - D1 caps one database at 10 GB: split stores across databases or archive old orders before you reach it.

@@ -9,4 +9,9 @@ interface CloudflareEnv {
   SESSION_SECRET: string;
   CF_API_TOKEN: string;
   ADMIN_PASSWORD: string;
+  // Google Sheet sync (scripts/google-sheet/Code.gs) — optional
+  SHEET_WEBHOOK_URL?: string;
+  SHEET_SECRET?: string;
+  // Daily job (/api/cron/daily) — called by the cron in worker.ts with this secret
+  CRON_SECRET?: string;
 }

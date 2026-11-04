@@ -1,7 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "nl-stores",
-  "main": ".open-next/worker.js",
+  // Must be the exact name of the Worker in the Cloudflare dashboard (Workers Builds checks it)
+  "name": "nextlevelstores",
+  // worker.ts = the OpenNext app + the daily cron (scheduled handler)
+  "main": "worker.ts",
   "compatibility_date": "2025-08-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
@@ -12,10 +14,14 @@
     {
       "binding": "DB",
       "database_name": "stores-db",
-      // Create with: npx wrangler d1 create stores-db  -> paste the id here
-      "database_id": "REPLACE_WITH_D1_ID"
+      // stores-db (Cloudflare D1)
+      "database_id": "2e7e7bda-4315-4a3d-8806-5544f0c776e4",
+      // Schema changes: a new numbered file in db/migrations/, never edit an applied one
+      "migrations_dir": "db/migrations"
     }
   ],
+  // Daily renewals job: 07:00 UTC = 08:00 Algeria (see worker.ts, lib/daily-job.ts)
+  "triggers": { "crons": ["0 7 * * *"] },
   "r2_buckets": [
     {
       "binding": "MEDIA",
@@ -24,6 +30,7 @@
     }
   ],
   "vars": {
+    // Domain not bought yet: replace yourbrand.com here AND in the 3 NEXT_PUBLIC_ build variables
     "ROOT_DOMAIN": "yourbrand.com",
     "ADMIN_HOST": "admin.yourbrand.com",
     "CF_ZONE_ID": "REPLACE_WITH_ZONE_ID"
