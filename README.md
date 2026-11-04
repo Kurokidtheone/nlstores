@@ -125,9 +125,14 @@ Never edit a migration that is already applied.
 
 ## Deploy to Cloudflare
 
-Deployment is automatic: Cloudflare Workers Builds is connected to this GitHub repository.
-Every push to `main` runs `npx opennextjs-cloudflare build`, then `npm run deploy:ci`
-(applies new D1 migrations, then deploys). The click-by-click setup is in the pull request
+Deployment is automatic: Cloudflare Workers Builds is connected to this GitHub repository, and
+the default build settings work as they are:
+
+- Worker name in the dashboard = `"name"` in `wrangler.jsonc` (**`nextlevelstores`**).
+- Build command `npm run build` = `opennextjs-cloudflare build` (it runs `next build` itself), then
+  `scripts/ci-migrate.mjs` applies new D1 migrations — only in a Cloudflare build of `main`.
+- Deploy command `npx wrangler deploy` (default) or `npm run deploy:ci` (same, migrations again: harmless).
+- Public build values come from `.env.production`; Cloudflare "Build variables" override them. The click-by-click setup is in the pull request
 that added it. Domain not bought yet: `yourbrand.com` is a placeholder everywhere.
 
 Before going live on a domain:

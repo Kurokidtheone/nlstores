@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "nl-stores",
+  // Must be the exact name of the Worker in the Cloudflare dashboard (Workers Builds checks it)
+  "name": "nextlevelstores",
   // worker.ts = the OpenNext app + the daily cron (scheduled handler)
   "main": "worker.ts",
   "compatibility_date": "2025-08-01",
